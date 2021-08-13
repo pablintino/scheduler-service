@@ -10,13 +10,12 @@
     </parent>
     <groupId>com.pablintino.services</groupId>
     <artifactId>scheduler-service-root</artifactId>
-    <version>${service.version}</version>
+    <version>0.0.1-SNAPSHOT</version>
     <name>scheduler-service-root</name>
     <description>Scheduler service for pablintino arq.</description>
     <packaging>pom</packaging>
     <properties>
         <java.version>16</java.version>
-        <service.version>0.0.1-SNAPSHOT</service.version>
     </properties>
 
     <modules>
