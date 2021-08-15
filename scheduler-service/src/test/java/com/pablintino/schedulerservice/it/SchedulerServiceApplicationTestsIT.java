@@ -1,13 +1,12 @@
-package com.pablintino.schedulerservice;
+package com.pablintino.schedulerservice.it;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class SchedulerServiceApplicationTests {
+class SchedulerServiceApplicationTestsIT {
 
 	@Test
 	void contextLoads() {
 	}
-
 }

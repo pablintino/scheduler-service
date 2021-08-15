@@ -1,9 +1,7 @@
 package com.pablintino.schedulerservice.config;
 
 
-import com.pablintino.schedulerservice.SchedulerJobFactory;
 import org.springframework.boot.autoconfigure.quartz.QuartzProperties;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
@@ -12,23 +10,24 @@ import javax.sql.DataSource;
 import java.util.Properties;
 
 @Configuration
-public class QuatzConfiguration {
+public class QuartzConfiguration {
 
     @Bean
-    public SchedulerFactoryBean schedulerFactoryBean(DataSource dataSource, ApplicationContext applicationContext, QuartzProperties quartzProperties) {
+    SchedulerJobFactory schedulerJobFactory(){
+        return new SchedulerJobFactory();
+    }
 
-        SchedulerJobFactory jobFactory = new SchedulerJobFactory();
-        jobFactory.setApplicationContext(applicationContext);
-
-        Properties properties = new Properties();
-        properties.putAll(quartzProperties.getProperties());
-
+    @Bean
+    public SchedulerFactoryBean schedulerFactoryBean(DataSource dataSource,
+                                                     SchedulerJobFactory jobFactory,
+                                                     QuartzProperties quartzProperties) {
+        Properties props = new Properties();
+        props.putAll(quartzProperties.getProperties());
         SchedulerFactoryBean factory = new SchedulerFactoryBean();
         factory.setOverwriteExistingJobs(true);
         factory.setDataSource(dataSource);
-        factory.setQuartzProperties(properties);
+        factory.setQuartzProperties(props);
         factory.setJobFactory(jobFactory);
         return factory;
     }
-
 }

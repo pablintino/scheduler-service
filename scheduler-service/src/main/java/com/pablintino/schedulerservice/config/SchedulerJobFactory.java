@@ -1,4 +1,4 @@
-package com.pablintino.schedulerservice;
+package com.pablintino.schedulerservice.config;
 
 import org.quartz.spi.TriggerFiredBundle;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
