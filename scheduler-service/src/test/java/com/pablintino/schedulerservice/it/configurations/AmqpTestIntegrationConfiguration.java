@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class AmqpTestIntegratrionConfiguration {
+public class AmqpTestIntegrationConfiguration {
 
     public static final String QUEUE_KEY = "svc.schedules.test-queue";
 

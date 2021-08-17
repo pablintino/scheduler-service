@@ -1,7 +1,7 @@
 package com.pablintino.schedulerservice.it;
 
 import com.pablintino.schedulerservice.dtos.AmqpCallbackMessage;
-import com.pablintino.schedulerservice.it.configurations.AmqpTestIntegratrionConfiguration;
+import com.pablintino.schedulerservice.it.configurations.AmqpTestIntegrationConfiguration;
 import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.services.ICallbackService;
@@ -19,8 +19,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
-@Import(AmqpTestIntegratrionConfiguration.class)
-class SchedulerServiceApplicationTestIT {
+@Import(AmqpTestIntegrationConfiguration.class)
+class CallbackServiceAMQPIntegrationIT {
 	@Autowired
 	private ICallbackService callbackService;
 
@@ -30,17 +30,17 @@ class SchedulerServiceApplicationTestIT {
 	private BlockingQueue<AmqpCallbackMessage> messageQueue = new LinkedBlockingQueue<>();
 
 	@Test
-	void testTest1() throws InterruptedException {
+	void simpleSendOK() throws InterruptedException {
 		JobDataMap map = new JobDataMap();
 		map.put("test-key", "test");
-		SchedulerJobData schedulerJobData = new SchedulerJobData("test", AmqpTestIntegratrionConfiguration.QUEUE_KEY, null, CallbackType.AMQP);
+		SchedulerJobData schedulerJobData = new SchedulerJobData("test", AmqpTestIntegrationConfiguration.QUEUE_KEY, null, CallbackType.AMQP);
 		callbackService.executeCallback(schedulerJobData, map);
 
 		AmqpCallbackMessage message = messageQueue.poll(10, TimeUnit.SECONDS);
 		Assertions.assertNotNull(message);
 	}
 
-	@RabbitListener(queues={AmqpTestIntegratrionConfiguration.QUEUE_KEY})
+	@RabbitListener(queues={AmqpTestIntegrationConfiguration.QUEUE_KEY})
 	public void queueListener(AmqpCallbackMessage callbackMessage){
 		try {
 			messageQueue.put(callbackMessage);

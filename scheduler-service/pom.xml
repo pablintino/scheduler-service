@@ -79,6 +79,16 @@
     <profiles>
         <profile>
             <id>it-test</id>
+            <properties>
+                <postgres.user>postgres</postgres.user>
+                <postgres.password>changeme</postgres.password>
+                <postgres.db.name>it-database</postgres.db.name>
+                <postgres.port>56342</postgres.port>
+                <postgres.host>localhost</postgres.host>
+                <rabbitmq.host>localhost</rabbitmq.host>
+                <rabbitmq.ui.port>56343</rabbitmq.ui.port>
+                <rabbitmq.broker.port>56344</rabbitmq.broker.port>
+            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -90,7 +100,76 @@
                                     <goal>verify</goal>
                                 </goals>
                                 <configuration>
+                                    <systemProperties>
+                                        <spring.datasource.url>jdbc:postgresql://${postgres.host}:${postgres.port}/${postgres.db.name}</spring.datasource.url>
+                                        <spring.datasource.username>${postgres.user}</spring.datasource.username>
+                                        <spring.datasource.password>${postgres.password}</spring.datasource.password>
+                                        <spring.rabbitmq.host>${rabbitmq.host}</spring.rabbitmq.host>
+                                        <spring.rabbitmq.port>${rabbitmq.broker.port}</spring.rabbitmq.port>
+                                    </systemProperties>
                                 </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>io.fabric8</groupId>
+                        <artifactId>docker-maven-plugin</artifactId>
+                        <version>0.33.0</version>
+                        <configuration>
+                            <images>
+                                <image>
+                                    <name>postgres:13.4</name>
+                                    <alias>it-database</alias>
+                                    <run>
+                                        <ports>
+                                            <port>${postgres.port}:5432</port>
+                                        </ports>
+                                        <env>
+                                            <POSTGRES_USER>${postgres.user}</POSTGRES_USER>
+                                            <POSTGRES_PASSWORD>${postgres.password}</POSTGRES_PASSWORD>
+                                            <POSTGRES_DB>${postgres.db.name}</POSTGRES_DB>
+                                        </env>
+                                        <wait>
+                                            <log>database system is ready to accept connections</log>
+                                            <time>20000</time>
+                                        </wait>
+                                    </run>
+                                </image>
+                                <image>
+                                    <name>rabbitmq:3-management</name>
+                                    <alias>it-rabbitmq</alias>
+                                    <run>
+                                        <ports>
+                                            <port>${rabbitmq.ui.port}:15672</port>
+                                            <port>${rabbitmq.broker.port}:5672</port>
+                                        </ports>
+                                        <wait>
+                                            <http>
+                                                <url>http://${rabbitmq.host}:${rabbitmq.ui.port}</url>
+                                                <method>GET</method>
+                                                <status>200..399</status>
+                                            </http>
+                                            <time>20000</time>
+                                        </wait>
+
+                                    </run>
+                                </image>
+                            </images>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>prepare-it-database</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>remove-containers</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>
