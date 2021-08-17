@@ -6,6 +6,7 @@ import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.services.ICallbackService;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.quartz.JobDataMap;
 import org.springframework.amqp.core.DirectExchange;
@@ -30,6 +31,7 @@ class CallbackServiceAMQPIntegrationIT {
 	private BlockingQueue<AmqpCallbackMessage> messageQueue = new LinkedBlockingQueue<>();
 
 	@Test
+	@DisplayName("Simple passing test that sends a controller payload that is expected to be received correctly")
 	void simpleSendOK() throws InterruptedException {
 		JobDataMap map = new JobDataMap();
 		map.put("test-key", "test");

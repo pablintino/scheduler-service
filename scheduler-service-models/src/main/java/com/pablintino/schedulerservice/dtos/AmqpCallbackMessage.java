@@ -1,5 +1,6 @@
 package com.pablintino.schedulerservice.dtos;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -9,6 +10,7 @@ import java.util.Map;
 
 @Getter
 @ToString
+@EqualsAndHashCode
 public class AmqpCallbackMessage implements Serializable {
 
     private static final long serialVersionUID = 1L;
