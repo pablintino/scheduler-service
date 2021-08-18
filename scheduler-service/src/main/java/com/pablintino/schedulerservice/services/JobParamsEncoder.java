@@ -2,7 +2,7 @@ package com.pablintino.schedulerservice.services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pablintino.schedulerservice.exceptions.SchedulerValidationError;
+import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.models.Task;
@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class JobParamsEncoder implements IJobParamsEncoder {
@@ -20,7 +21,7 @@ public class JobParamsEncoder implements IJobParamsEncoder {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public Map<String, Object> encodeJobParameters(Task task, Endpoint endpoint) throws SchedulerValidationError {
+    public Map<String, Object> encodeJobParameters(Task task, Endpoint endpoint) {
 
         SchedulerJobData jobData = new SchedulerJobData(
                 task.id(),
@@ -32,14 +33,14 @@ public class JobParamsEncoder implements IJobParamsEncoder {
         try {
             return Collections.singletonMap(SCHEDULER_JOB_PROPERTY_NAME, objectMapper.writeValueAsString(jobData));
         } catch (JsonProcessingException ex) {
-            throw new SchedulerValidationError("Cannot create internal json datamap", ex);
+            throw new SchedulerValidationException("Cannot create internal json datamap", ex);
         }
     }
 
     @Override
-    public SchedulerJobData extractDecodeJobParameters(JobDataMap jobDataMap) throws SchedulerValidationError {
+    public SchedulerJobData extractDecodeJobParameters(JobDataMap jobDataMap) {
         if (!jobDataMap.containsKey(SCHEDULER_JOB_PROPERTY_NAME)) {
-            throw new SchedulerValidationError("JobDataMap doesn't contain the internal scheduler property");
+            throw new SchedulerValidationException("JobDataMap doesn't contain the internal scheduler property");
         }
         try {
             SchedulerJobData schedulerJobData = objectMapper.readValue(
@@ -49,7 +50,18 @@ public class JobParamsEncoder implements IJobParamsEncoder {
             jobDataMap.remove(SCHEDULER_JOB_PROPERTY_NAME);
             return schedulerJobData;
         } catch (JsonProcessingException ex) {
-            throw new SchedulerValidationError("Cannot decode internal json datamap", ex);
+            throw new SchedulerValidationException("Cannot decode internal json datamap", ex);
         }
+    }
+
+    @Override
+    public Map<String, Object> removeJobParameters(Map<String, Object> jobDataMap) {
+        if(jobDataMap != null){
+            Map<String, Object> dataMap = jobDataMap.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            dataMap.remove(SCHEDULER_JOB_PROPERTY_NAME);
+            return dataMap;
+        }
+        return jobDataMap;
     }
 }

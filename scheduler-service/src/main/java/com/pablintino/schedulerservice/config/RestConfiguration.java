@@ -4,7 +4,6 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ComponentScan(basePackages = {"com.pablintino.schedulerservice.services"})
-@ComponentScan(basePackageClasses = CommonConfiguration.class)
-public class CommonConfiguration {
+@ComponentScan("com.pablintino.schedulerservice.rest")
+public class RestConfiguration {
 }

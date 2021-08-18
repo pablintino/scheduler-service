@@ -1,4 +1,4 @@
-package com.pablintino.schedulerservice.dtos;
+package com.pablintino.schedulerservice.amqp;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

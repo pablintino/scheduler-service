@@ -1,6 +1,6 @@
 package com.pablintino.schedulerservice.services;
 
-import com.pablintino.schedulerservice.exceptions.SchedulerValidationError;
+import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.exceptions.SchedulingException;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.Task;
@@ -13,16 +13,19 @@ import org.springframework.stereotype.Service;
 
 import org.quartz.SimpleScheduleBuilder;
 
-import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 
 @Service
 @RequiredArgsConstructor
 public class SchedulingService implements ISchedulingService {
 
-    private static final String TRIGGER_NAME_PREFIX="cbtrg-";
-    private static final String JOB_NAME_PREFIX="cbjob-";
+    private static final String TRIGGER_NAME_PREFIX = "cbtrg-";
+    private static final String JOB_NAME_PREFIX = "cbjob-";
 
     private final Scheduler scheduler;
     private final IJobParamsEncoder jobParamsEncoder;
@@ -34,9 +37,40 @@ public class SchedulingService implements ISchedulingService {
             Trigger trigger = prepareNewTrigger(task);
             JobDetail job = prepareNewJob(task, endpoint);
             scheduler.scheduleJob(job, trigger);
-        } catch (SchedulerException | SchedulerValidationError ex) {
+        } catch (SchedulerException ex) {
             throw new SchedulingException("An error occurred when scheduling a job", ex);
         }
+    }
+
+    @Override
+    public List<Task> getTasksForKey(String key) {
+        List<Task> tasks = new ArrayList<>();
+        try {
+            for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.groupEquals(key))) {
+                JobDetail jobDetail = scheduler.getJobDetail(jobKey);
+                List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
+                if (!triggers.isEmpty()) {
+                    Trigger trigger = triggers.get(0);
+                    String cronExpression = null;
+                    ZonedDateTime triggerTime = null;
+                    if (trigger instanceof CronTrigger) {
+                        cronExpression = ((CronTrigger) trigger).getCronExpression();
+                    } else if (trigger instanceof SimpleTrigger) {
+                        triggerTime = ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC);
+                    }
+
+                    Task task = new Task(
+                            jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
+                            jobKey.getGroup(), triggerTime, cronExpression,
+                            jobParamsEncoder.removeJobParameters(jobDetail.getJobDataMap().getWrappedMap())
+                    );
+                    tasks.add(task);
+                }
+            }
+        } catch (SchedulerException e) {
+            e.printStackTrace();
+        }
+        return tasks;
     }
 
     private Trigger prepareNewTrigger(Task task) throws SchedulerException, SchedulingException {
@@ -46,10 +80,14 @@ public class SchedulingService implements ISchedulingService {
             throw new SchedulingException("Task " + task.id() + " has been already scheduled");
         }
 
+        if(task.triggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))){
+            throw new SchedulerValidationException("Task time initial time is a past time");
+        }
+
         return TriggerBuilder
                 .newTrigger()
                 .withIdentity(triggerName, task.key())
-                .startAt(Date.from(task.triggerTime().atZone(ZoneId.systemDefault()).toInstant()))
+                .startAt(Date.from(task.triggerTime().toInstant()))
                 .withSchedule(SimpleScheduleBuilder.simpleSchedule())
                 .build();
     }
@@ -64,7 +102,7 @@ public class SchedulingService implements ISchedulingService {
         return JobBuilder
                 .newJob(CallbackJob.class)
                 .withIdentity(jobName, task.key())
-                .setJobData(createDataMap(task,endpoint))
+                .setJobData(createDataMap(task, endpoint))
                 .build();
     }
 
@@ -80,7 +118,7 @@ public class SchedulingService implements ISchedulingService {
                 .stream().anyMatch(tk -> tk.getName().equals(jobName));
     }
 
-    private JobDataMap createDataMap(Task task, Endpoint endpoint) throws SchedulerValidationError {
+    private JobDataMap createDataMap(Task task, Endpoint endpoint) {
         if (task.taskData().values().stream()
                 .anyMatch(o ->
                         !ClassUtils.isPrimitiveOrWrapper(o.getClass()) &&

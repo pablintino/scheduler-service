@@ -1,6 +1,7 @@
 package com.pablintino.schedulerservice.config;
 
 
+import com.pablintino.schedulerservice.config.scheduler.SchedulerJobFactory;
 import org.springframework.boot.autoconfigure.quartz.QuartzProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

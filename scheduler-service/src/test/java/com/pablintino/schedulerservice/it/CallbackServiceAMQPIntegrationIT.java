@@ -1,6 +1,6 @@
 package com.pablintino.schedulerservice.it;
 
-import com.pablintino.schedulerservice.dtos.AmqpCallbackMessage;
+import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
 import com.pablintino.schedulerservice.it.configurations.AmqpTestIntegrationConfiguration;
 import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.SchedulerJobData;

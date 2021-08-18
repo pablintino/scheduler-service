@@ -1,6 +1,6 @@
 package com.pablintino.schedulerservice.services;
 
-import com.pablintino.schedulerservice.dtos.AmqpCallbackMessage;
+import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
 import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import org.quartz.JobDataMap;
@@ -32,7 +32,7 @@ public class CallbackService implements ICallbackService {
         }
     }
 
-    private void executeAmqpCallback(SchedulerJobData schedulerJobData, JobDataMap jobDataMap) {
+    private void  executeAmqpCallback(SchedulerJobData schedulerJobData, JobDataMap jobDataMap) {
         AmqpCallbackMessage message = new AmqpCallbackMessage(
                 schedulerJobData.taskId(),
                 schedulerJobData.key(),

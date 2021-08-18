@@ -1,6 +1,6 @@
 package com.pablintino.schedulerservice.quartz;
 
-import com.pablintino.schedulerservice.exceptions.SchedulerValidationError;
+import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.services.ICallbackService;
 import com.pablintino.schedulerservice.services.IJobParamsEncoder;
@@ -24,7 +24,7 @@ public class CallbackJob implements Job {
             JobDataMap jobDataMap = context.getMergedJobDataMap();
             SchedulerJobData jobData = jobParamsEncoder.extractDecodeJobParameters(jobDataMap);
             callbackService.executeCallback(jobData, jobDataMap);
-        }catch (SchedulerValidationError ex){
+        }catch (SchedulerValidationException ex){
             log.error("Validation exception while running JOB" + context.getJobDetail(), ex);
             throw new JobExecutionException(ex, false);
         }
