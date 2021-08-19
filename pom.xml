@@ -21,6 +21,7 @@
     <modules>
         <module>scheduler-service</module>
         <module>scheduler-service-models</module>
+        <module>scheduler-service-client</module>
     </modules>
 
     <dependencies>

@@ -49,25 +49,24 @@ public class SchedulingService implements ISchedulingService {
             for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.groupEquals(key))) {
                 JobDetail jobDetail = scheduler.getJobDetail(jobKey);
                 List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
-                if (!triggers.isEmpty()) {
+                if (!triggers.isEmpty() && triggers.size() == 1) {
                     Trigger trigger = triggers.get(0);
-                    String cronExpression = null;
-                    ZonedDateTime triggerTime = null;
-                    if (trigger instanceof CronTrigger) {
-                        cronExpression = ((CronTrigger) trigger).getCronExpression();
-                    } else if (trigger instanceof SimpleTrigger) {
-                        triggerTime = ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC);
-                    }
+                    String cronExpression = trigger instanceof CronTrigger
+                            ? ((CronTrigger) trigger).getCronExpression()
+                            : null;
 
                     Task task = new Task(
                             jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
-                            jobKey.getGroup(), triggerTime, cronExpression,
+                            jobKey.getGroup(),
+                            ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
+                            cronExpression,
                             jobParamsEncoder.removeJobParameters(jobDetail.getJobDataMap().getWrappedMap())
                     );
                     tasks.add(task);
                 }
             }
         } catch (SchedulerException e) {
+            // TODO Temporal
             e.printStackTrace();
         }
         return tasks;
@@ -80,7 +79,7 @@ public class SchedulingService implements ISchedulingService {
             throw new SchedulingException("Task " + task.id() + " has been already scheduled");
         }
 
-        if(task.triggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))){
+        if (task.triggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))) {
             throw new SchedulerValidationException("Task time initial time is a past time");
         }
 
