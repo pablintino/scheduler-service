@@ -136,7 +136,7 @@ public class SchedulingService implements ISchedulingService {
     }
 
     private JobDataMap createDataMap(Task task, Endpoint endpoint) {
-        if (task.taskData().values().stream()
+        if (task.taskData() != null && task.taskData().values().stream()
                 .anyMatch(o ->
                         !ClassUtils.isPrimitiveOrWrapper(o.getClass()) &&
                                 !String.class.equals(o.getClass()))
@@ -145,7 +145,9 @@ public class SchedulingService implements ISchedulingService {
         }
 
         JobDataMap dataMap = new JobDataMap();
-        dataMap.putAll(task.taskData());
+        if (task.taskData() != null){
+            dataMap.putAll(task.taskData());
+        }
         dataMap.putAll(jobParamsEncoder.encodeJobParameters(task, endpoint));
         return dataMap;
     }
