@@ -1,11 +1,14 @@
 package com.pablintino.schedulerservice.exceptions;
 
-public class SchedulerValidationException extends RuntimeException{
+import com.pablintino.services.commons.exceptions.GenericHttpServiceException;
+import org.springframework.http.HttpStatus;
+
+public class SchedulerValidationException extends GenericHttpServiceException {
     public SchedulerValidationException(String message){
-        super(message);
+        super(message, HttpStatus.BAD_REQUEST.value());
     }
 
     public SchedulerValidationException(String message, Throwable throwable){
-        super(message, throwable);
+        super(message, HttpStatus.BAD_REQUEST.value(), throwable);
     }
 }

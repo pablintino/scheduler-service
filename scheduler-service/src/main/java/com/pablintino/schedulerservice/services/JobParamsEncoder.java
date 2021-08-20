@@ -62,6 +62,6 @@ public class JobParamsEncoder implements IJobParamsEncoder {
             dataMap.remove(SCHEDULER_JOB_PROPERTY_NAME);
             return dataMap;
         }
-        return jobDataMap;
+        return null;
     }
 }

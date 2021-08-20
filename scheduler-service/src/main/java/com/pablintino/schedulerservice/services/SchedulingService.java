@@ -11,8 +11,6 @@ import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.stereotype.Service;
 
-import org.quartz.SimpleScheduleBuilder;
-
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -31,7 +29,7 @@ public class SchedulingService implements ISchedulingService {
     private final IJobParamsEncoder jobParamsEncoder;
 
     @Override
-    public void scheduleTask(Task task, Endpoint endpoint) throws SchedulingException {
+    public void scheduleTask(Task task, Endpoint endpoint) {
         try {
 
             Trigger trigger = prepareNewTrigger(task);
@@ -43,13 +41,23 @@ public class SchedulingService implements ISchedulingService {
     }
 
     @Override
+    public void deleteTask(String taskKey, String taskId) {
+        JobKey jobKey = JobKey.jobKey(JOB_NAME_PREFIX + taskId, taskKey);
+        try {
+            scheduler.deleteJob(jobKey);
+        } catch (SchedulerException ex) {
+            throw new SchedulingException("An error occurred while deleting a task " + jobKey, ex);
+        }
+    }
+
+    @Override
     public List<Task> getTasksForKey(String key) {
         List<Task> tasks = new ArrayList<>();
         try {
             for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.groupEquals(key))) {
                 JobDetail jobDetail = scheduler.getJobDetail(jobKey);
                 List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
-                if (!triggers.isEmpty() && triggers.size() == 1) {
+                if (triggers.size() == 1) {
                     Trigger trigger = triggers.get(0);
                     String cronExpression = trigger instanceof CronTrigger
                             ? ((CronTrigger) trigger).getCronExpression()
@@ -72,11 +80,11 @@ public class SchedulingService implements ISchedulingService {
         return tasks;
     }
 
-    private Trigger prepareNewTrigger(Task task) throws SchedulerException, SchedulingException {
+    private Trigger prepareNewTrigger(Task task) throws SchedulerException {
         String triggerName = TRIGGER_NAME_PREFIX + task.id();
 
         if (triggerExists(triggerName, task.key())) {
-            throw new SchedulingException("Task " + task.id() + " has been already scheduled");
+            throw new SchedulerValidationException("Task " + task.id() + " has been already scheduled");
         }
 
         if (task.triggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))) {
@@ -91,7 +99,7 @@ public class SchedulingService implements ISchedulingService {
                 .build();
     }
 
-    private JobDetail prepareNewJob(Task task, Endpoint endpoint) throws SchedulerException, SchedulingException {
+    private JobDetail prepareNewJob(Task task, Endpoint endpoint) throws SchedulerException {
         String jobName = JOB_NAME_PREFIX + task.id();
 
         if (jobExists(jobName, task.key())) {

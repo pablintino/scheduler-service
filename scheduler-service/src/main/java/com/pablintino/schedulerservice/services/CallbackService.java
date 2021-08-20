@@ -32,7 +32,7 @@ public class CallbackService implements ICallbackService {
         }
     }
 
-    private void  executeAmqpCallback(SchedulerJobData schedulerJobData, JobDataMap jobDataMap) {
+    private void executeAmqpCallback(SchedulerJobData schedulerJobData, JobDataMap jobDataMap) {
         AmqpCallbackMessage message = new AmqpCallbackMessage(
                 schedulerJobData.taskId(),
                 schedulerJobData.key(),

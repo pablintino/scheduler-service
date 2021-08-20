@@ -1,6 +1,5 @@
 package com.pablintino.schedulerservice.services;
 
-import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.models.Task;

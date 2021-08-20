@@ -26,11 +26,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
+@TestPropertySource(locations="classpath:test-properties.properties")
 class ClientIntegrationTest {
 
 	@EnableRabbit
 	@Configuration
-	@TestPropertySource(locations="classpath:application.properties")
 	@Import(SchedulerClientConfiguration.class)
 	static class TestConfiguration{
 

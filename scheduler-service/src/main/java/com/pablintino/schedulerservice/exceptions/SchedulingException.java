@@ -1,6 +1,8 @@
 package com.pablintino.schedulerservice.exceptions;
 
-public class SchedulingException extends Exception{
+import com.pablintino.services.commons.exceptions.GenericHttpServiceException;
+
+public class SchedulingException extends GenericHttpServiceException {
     public SchedulingException(String message){
         super(message);
     }

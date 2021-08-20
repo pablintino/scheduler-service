@@ -4,6 +4,7 @@ import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
 import com.pablintino.schedulerservice.dtos.CallbackDescriptorDto;
 import com.pablintino.schedulerservice.dtos.CallbackMethodTypeDto;
 import com.pablintino.schedulerservice.dtos.ScheduleRequestDto;
+import com.pablintino.services.commons.responses.HttpErrorBody;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -58,7 +59,7 @@ public class SchedulerServiceClient implements ISchedulerServiceClient {
         Assert.notNull(id, "id cannot be null or empty");
         Assert.notNull(id, "triggerTime cannot be null");
 
-        /** Prepare the request body */
+        /* Prepare the request body */
         ScheduleRequestDto request = new ScheduleRequestDto();
         request.setTaskData(data);
         request.setTaskKey(key);
@@ -72,41 +73,45 @@ public class SchedulerServiceClient implements ISchedulerServiceClient {
                 .uri("/schedules")
                 .body(Mono.just(request), ScheduleRequestDto.class)
                 .retrieve()
-                .onStatus(HttpStatus::isError, response -> {
-                    log.error("Error");
-                    // TODO Retrieve error body and use it in the exception
-                    return Mono.error(new ScheduleServiceClientException("Schedule request rejected"));
-                })
+                .onStatus(HttpStatus::isError, response ->
+                        response
+                                .bodyToMono(HttpErrorBody.class)
+                                .flatMap(err ->
+                                        Mono.error(new ScheduleServiceClientException(err.getErrorMessage()))
+                                )
+
+                )
                 .bodyToMono(Void.class)
                 .timeout(Duration.of(clientTimeout, ChronoUnit.MILLIS)).block();
     }
 
     @Override
     public void registerCallback(String key, IScheduleCallback callback) {
-        if(callbackMap.containsKey(key)){
+        if (callbackMap.containsKey(key)) {
             throw new ScheduleServiceClientException("Key  " + key + " was already registered");
         }
 
         Queue queue = new Queue(key);
-        if(rabbitAdmin.getQueueInfo(key) == null){
+        if (rabbitAdmin.getQueueInfo(key) == null) {
+            log.debug("No queue seems to exist for key " + key + ". Creating queue");
             rabbitAdmin.declareQueue(queue);
         }
 
         rabbitAdmin.declareBinding(BindingBuilder.bind(queue).to(new DirectExchange(exchange)).withQueueName());
 
-        AbstractMessageListenerContainer container = ((AbstractMessageListenerContainer)rabbitListenerEndpointRegistry.getListenerContainer(LISTENER_ID));
-        if(Arrays.stream(container.getQueueNames()).noneMatch(qn -> qn.equals(key))){
+        AbstractMessageListenerContainer container = ((AbstractMessageListenerContainer) rabbitListenerEndpointRegistry.getListenerContainer(LISTENER_ID));
+        if (Arrays.stream(container.getQueueNames()).noneMatch(qn -> qn.equals(key))) {
+            log.debug("Registering " + key + " in message listener");
             container.addQueueNames(key);
-            container.stop();
-            container.start();
         }
 
         callbackMap.put(key, callback);
     }
 
     @RabbitListener(id = LISTENER_ID, concurrency = "10")
-    public void queueListener(AmqpCallbackMessage callbackMessage){
-        if(callbackMap.containsKey(callbackMessage.getKey())){
+    public void queueListener(AmqpCallbackMessage callbackMessage) {
+        log.debug("Incoming AMQP message " + callbackMessage);
+        if (callbackMap.containsKey(callbackMessage.getKey())) {
             callbackMap.get(callbackMessage.getKey())
                     .callback(callbackMessage.getId(), callbackMessage.getKey(), callbackMessage.getDataMap());
         }

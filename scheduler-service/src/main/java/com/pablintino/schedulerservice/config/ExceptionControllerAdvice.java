@@ -1,32 +1,44 @@
 package com.pablintino.schedulerservice.config;
 
-import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
+import com.pablintino.services.commons.exceptions.GenericHttpServiceException;
+import com.pablintino.services.commons.mappers.ErrorBodyMapper;
+import com.pablintino.services.commons.responses.HttpErrorBody;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import javax.servlet.http.HttpServletRequest;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
-public class ExceptionControllerAdvice  {
+public class ExceptionControllerAdvice {
 
-    @ExceptionHandler(SchedulerValidationException.class)
-    public ResponseEntity<String> handleWhateverException(SchedulerValidationException ex, HttpServletRequest httpServletRequest) {
-        return new ResponseEntity(createCommonMap(ex, httpServletRequest), HttpStatus.BAD_REQUEST);
+    private final ErrorBodyMapper errorBodyMapper;
+
+    public ExceptionControllerAdvice(@Value("${com.pablintino.scheduler.service.debug:false}") boolean debugMode){
+        this.errorBodyMapper = new ErrorBodyMapper(debugMode);
     }
 
-    private Map<String, Object> createCommonMap(Exception ex, HttpServletRequest httpServletRequest){
-        Map<String, Object> detailsMap = new HashMap<>();
+    @ExceptionHandler(GenericHttpServiceException.class)
+    public ResponseEntity<HttpErrorBody> handleGenericHttpServiceException(GenericHttpServiceException ex, HttpServletRequest httpServletRequest) {
+        HttpErrorBody errorBody = errorBodyMapper.mapFromException(ex);
+        errorBody.setPath(httpServletRequest.getRequestURI());
+        return new ResponseEntity<>(errorBody, HttpStatus.resolve(errorBody.getStatus()));
+    }
 
-        detailsMap.put("timestamp", LocalDateTime.now().toInstant(ZoneOffset.UTC).getEpochSecond());
-        detailsMap.put("error", ex.getMessage());
-        detailsMap.put("exception", ex.getClass().getName());
-        detailsMap.put("path", httpServletRequest.getRequestURI());
-        return detailsMap;
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<HttpErrorBody> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest httpServletRequest) {
+        Map<String, String> errors = ex.getBindingResult()
+                .getAllErrors()
+                .stream()
+                .collect(Collectors.toMap(k -> ((FieldError)k).getField(), DefaultMessageSourceResolvable::getDefaultMessage));
+
+        return new ResponseEntity<>(errorBodyMapper.mapFromValidationException(ex, httpServletRequest, HttpStatus.BAD_REQUEST.value(), errors), HttpStatus.BAD_REQUEST);
     }
 }

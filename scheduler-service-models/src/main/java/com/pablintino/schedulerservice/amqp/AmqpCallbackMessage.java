@@ -4,6 +4,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,8 +14,10 @@ import java.util.Map;
 @EqualsAndHashCode
 public class AmqpCallbackMessage implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
+    @ToString.Exclude
     private final Map<String, Object> dataMap;
     private final String id;
     private final String key;
