@@ -54,6 +54,11 @@
             <artifactId>commons-lang3</artifactId>
         </dependency>
         <dependency>
+            <groupId>commons-validator</groupId>
+            <artifactId>commons-validator</artifactId>
+            <version>1.7</version>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
         </dependency>
@@ -110,7 +115,9 @@
                                 </goals>
                                 <configuration>
                                     <systemProperties>
-                                        <spring.datasource.url>jdbc:postgresql://${postgres.host}:${postgres.port}/${postgres.db.name}</spring.datasource.url>
+                                        <spring.datasource.url>
+                                            jdbc:postgresql://${postgres.host}:${postgres.port}/${postgres.db.name}
+                                        </spring.datasource.url>
                                         <spring.datasource.username>${postgres.user}</spring.datasource.username>
                                         <spring.datasource.password>${postgres.password}</spring.datasource.password>
                                         <spring.rabbitmq.host>${rabbitmq.host}</spring.rabbitmq.host>

@@ -2,11 +2,14 @@ package com.pablintino.schedulerservice.services;
 
 import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.exceptions.SchedulingException;
+import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.Task;
 import com.pablintino.schedulerservice.quartz.CallbackJob;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.validator.routines.UrlValidator;
 import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.stereotype.Service;
@@ -83,20 +86,23 @@ public class SchedulingService implements ISchedulingService {
     private Trigger prepareNewTrigger(Task task) throws SchedulerException {
         String triggerName = TRIGGER_NAME_PREFIX + task.id();
 
-        if (triggerExists(triggerName, task.key())) {
-            throw new SchedulerValidationException("Task " + task.id() + " has been already scheduled");
-        }
-
         if (task.triggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))) {
             throw new SchedulerValidationException("Task time initial time is a past time");
         }
 
-        return TriggerBuilder
+        if (triggerExists(triggerName, task.key())) {
+            throw new SchedulerValidationException("Task " + task.id() + " has been already scheduled");
+        }
+
+        TriggerBuilder<Trigger> builder = TriggerBuilder
                 .newTrigger()
                 .withIdentity(triggerName, task.key())
-                .startAt(Date.from(task.triggerTime().toInstant()))
-                .withSchedule(SimpleScheduleBuilder.simpleSchedule())
-                .build();
+                .startAt(Date.from(task.triggerTime().toInstant()));
+
+        if(StringUtils.isEmpty(task.cronExpression())){
+            return builder.withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
+        }
+        return builder.withSchedule(CronScheduleBuilder.cronSchedule(task.cronExpression())).build();
     }
 
     private JobDetail prepareNewJob(Task task, Endpoint endpoint) throws SchedulerException {
@@ -104,6 +110,10 @@ public class SchedulingService implements ISchedulingService {
 
         if (jobExists(jobName, task.key())) {
             throw new SchedulingException("Task " + task.id() + " has been already scheduled");
+        }
+
+        if(endpoint.callbackType() == CallbackType.HTTP  && !UrlValidator.getInstance().isValid(endpoint.callbackUrl())){
+            throw new SchedulerValidationException("Endpoint of type HTTP contains an invalid URL");
         }
 
         return JobBuilder
@@ -131,8 +141,7 @@ public class SchedulingService implements ISchedulingService {
                         !ClassUtils.isPrimitiveOrWrapper(o.getClass()) &&
                                 !String.class.equals(o.getClass()))
         ) {
-            // TODO Replace by a proper exception
-            throw new RuntimeException("Invalid data map type. Only primitives and String supported");
+            throw new SchedulerValidationException("Invalid data map type. Only primitives and Strings are supported");
         }
 
         JobDataMap dataMap = new JobDataMap();
