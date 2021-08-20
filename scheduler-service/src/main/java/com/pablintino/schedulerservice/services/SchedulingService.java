@@ -58,29 +58,46 @@ public class SchedulingService implements ISchedulingService {
         List<Task> tasks = new ArrayList<>();
         try {
             for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.groupEquals(key))) {
-                JobDetail jobDetail = scheduler.getJobDetail(jobKey);
-                List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
-                if (triggers.size() == 1) {
-                    Trigger trigger = triggers.get(0);
-                    String cronExpression = trigger instanceof CronTrigger
-                            ? ((CronTrigger) trigger).getCronExpression()
-                            : null;
-
-                    Task task = new Task(
-                            jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
-                            jobKey.getGroup(),
-                            ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
-                            cronExpression,
-                            jobParamsEncoder.removeJobParameters(jobDetail.getJobDataMap().getWrappedMap())
-                    );
-                    tasks.add(task);
-                }
+                tasks.add(getTaskFromJobKey(jobKey));
             }
-        } catch (SchedulerException e) {
-            // TODO Temporal
-            e.printStackTrace();
+        } catch (SchedulerException ex) {
+            throw new SchedulingException("An exception occurred while retrieving task details.", ex);
         }
         return tasks;
+    }
+
+    @Override
+    public Task getTask(String key, String taskId) {
+        try {
+            return getTaskFromJobKey(JobKey.jobKey(JOB_NAME_PREFIX + taskId, key));
+        } catch (SchedulerException ex) {
+            throw new SchedulingException("An exception occurred while retrieving task details.", ex);
+        }
+    }
+
+
+    private Task getTaskFromJobKey(JobKey jobKey) throws SchedulerException {
+        JobDetail jobDetail = scheduler.getJobDetail(jobKey);
+        if (jobDetail != null) {
+            List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
+            if (triggers.size() == 1) {
+                Trigger trigger = triggers.get(0);
+                String cronExpression = trigger instanceof CronTrigger
+                        ? ((CronTrigger) trigger).getCronExpression()
+                        : null;
+
+                Task task = new Task(
+                        jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
+                        jobKey.getGroup(),
+                        ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
+                        cronExpression,
+                        jobParamsEncoder.removeJobParameters(jobDetail.getJobDataMap().getWrappedMap())
+                );
+                return task;
+            }
+            throw new SchedulingException("Unexpected trigger count found for " + jobKey + " job");
+        }
+        return null;
     }
 
     private Trigger prepareNewTrigger(Task task) throws SchedulerException {
@@ -99,7 +116,7 @@ public class SchedulingService implements ISchedulingService {
                 .withIdentity(triggerName, task.key())
                 .startAt(Date.from(task.triggerTime().toInstant()));
 
-        if(StringUtils.isEmpty(task.cronExpression())){
+        if (StringUtils.isEmpty(task.cronExpression())) {
             return builder.withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
         }
         return builder.withSchedule(CronScheduleBuilder.cronSchedule(task.cronExpression())).build();
@@ -112,7 +129,7 @@ public class SchedulingService implements ISchedulingService {
             throw new SchedulingException("Task " + task.id() + " has been already scheduled");
         }
 
-        if(endpoint.callbackType() == CallbackType.HTTP  && !UrlValidator.getInstance().isValid(endpoint.callbackUrl())){
+        if (endpoint.callbackType() == CallbackType.HTTP && !UrlValidator.getInstance().isValid(endpoint.callbackUrl())) {
             throw new SchedulerValidationException("Endpoint of type HTTP contains an invalid URL");
         }
 
@@ -145,7 +162,7 @@ public class SchedulingService implements ISchedulingService {
         }
 
         JobDataMap dataMap = new JobDataMap();
-        if (task.taskData() != null){
+        if (task.taskData() != null) {
             dataMap.putAll(task.taskData());
         }
         dataMap.putAll(jobParamsEncoder.encodeJobParameters(task, endpoint));
