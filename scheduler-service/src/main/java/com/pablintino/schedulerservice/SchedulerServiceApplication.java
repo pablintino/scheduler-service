@@ -1,15 +1,12 @@
 package com.pablintino.schedulerservice;
 
-import com.pablintino.schedulerservice.config.AmqpConfiguration;
-import com.pablintino.schedulerservice.config.CommonConfiguration;
-import com.pablintino.schedulerservice.config.QuartzConfiguration;
-import com.pablintino.schedulerservice.config.RestConfiguration;
+import com.pablintino.schedulerservice.config.SchedulerServiceConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
-@Import(value = {CommonConfiguration.class, QuartzConfiguration.class, AmqpConfiguration.class, RestConfiguration.class})
+@Import(SchedulerServiceConfiguration.class)
 public class SchedulerServiceApplication {
 
 	public static void main(String[] args) {

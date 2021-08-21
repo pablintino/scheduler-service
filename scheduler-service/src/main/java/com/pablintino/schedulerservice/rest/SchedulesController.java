@@ -47,6 +47,7 @@ public class SchedulesController {
     }
 
     @DeleteMapping("/schedules/{key}/{id}")
+    @ResponseStatus(value = HttpStatus.NO_CONTENT)
     void deleteTask(@PathVariable("key") String key, @PathVariable("id") String id) {
         schedulingService.deleteTask(key, id);
     }

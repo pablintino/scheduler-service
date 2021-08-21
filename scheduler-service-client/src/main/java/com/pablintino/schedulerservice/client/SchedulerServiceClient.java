@@ -31,10 +31,11 @@ import java.util.Map;
 @Component
 public class SchedulerServiceClient implements ISchedulerServiceClient {
 
+    private final static String LISTENER_ID = "scheduler-client-listener";
+
     private final Map<String, IScheduleCallback> callbackMap = new HashMap<>();
     private final RabbitListenerEndpointRegistry rabbitListenerEndpointRegistry;
     private final AmqpAdmin rabbitAdmin;
-    private final static String LISTENER_ID = "scheduler-client-listener";
     private final WebClient schedulerClient;
     private final long clientTimeout;
     private final String exchange;
@@ -60,29 +61,21 @@ public class SchedulerServiceClient implements ISchedulerServiceClient {
         Assert.notNull(id, "triggerTime cannot be null");
 
         /* Prepare the request body */
-        ScheduleRequestDto request = new ScheduleRequestDto();
-        request.setTaskData(data);
-        request.setTaskKey(key);
-        request.setTaskIdentifier(id);
-        request.setTriggerTime(triggerTime);
-        CallbackDescriptorDto callbackDescriptor = new CallbackDescriptorDto();
-        callbackDescriptor.setType(CallbackMethodTypeDto.AMQP);
-        request.setCallbackDescriptor(callbackDescriptor);
+        ScheduleRequestDto request = createCommonRequest(key, id, triggerTime, data);
+        doCallRemote(request);
+    }
 
-        schedulerClient.post()
-                .uri("/schedules")
-                .body(Mono.just(request), ScheduleRequestDto.class)
-                .retrieve()
-                .onStatus(HttpStatus::isError, response ->
-                        response
-                                .bodyToMono(HttpErrorBody.class)
-                                .flatMap(err ->
-                                        Mono.error(new ScheduleServiceClientException(err.getErrorMessage()))
-                                )
+    @Override
+    public void scheduleTask(String key, String id, ZonedDateTime triggerTime, String cronExpression, Map<String, Object> data) {
+        Assert.hasLength(key, "key cannot be null");
+        Assert.notNull(id, "id cannot be null or empty");
+        Assert.notNull(id, "triggerTime cannot be null");
+        Assert.hasLength(id, "cronExpression cannot be null");
 
-                )
-                .bodyToMono(Void.class)
-                .timeout(Duration.of(clientTimeout, ChronoUnit.MILLIS)).block();
+        /* Prepare the request body */
+        ScheduleRequestDto request = createCommonRequest(key, id, triggerTime, data);
+        request.setCronExpression(cronExpression);
+        doCallRemote(request);
     }
 
     @Override
@@ -115,5 +108,34 @@ public class SchedulerServiceClient implements ISchedulerServiceClient {
             callbackMap.get(callbackMessage.getKey())
                     .callback(callbackMessage.getId(), callbackMessage.getKey(), callbackMessage.getDataMap());
         }
+    }
+
+    private static ScheduleRequestDto createCommonRequest(String key, String id, ZonedDateTime triggerTime, Map<String, Object> data) {
+        /* Prepare the request body */
+        ScheduleRequestDto request = new ScheduleRequestDto();
+        request.setTaskData(data);
+        request.setTaskKey(key);
+        request.setTaskIdentifier(id);
+        request.setTriggerTime(triggerTime);
+        CallbackDescriptorDto callbackDescriptor = new CallbackDescriptorDto();
+        callbackDescriptor.setType(CallbackMethodTypeDto.AMQP);
+        request.setCallbackDescriptor(callbackDescriptor);
+        return request;
+    }
+
+    private void doCallRemote(ScheduleRequestDto request) {
+        schedulerClient.post()
+                .uri("/schedules")
+                .body(Mono.just(request), ScheduleRequestDto.class)
+                .retrieve()
+                .onStatus(HttpStatus::isError, response ->
+                        response
+                                .bodyToMono(HttpErrorBody.class)
+                                .flatMap(err ->
+                                        Mono.error(new ScheduleServiceClientException(err.getErrorMessage()))
+                                )
+                )
+                .bodyToMono(Void.class)
+                .timeout(Duration.of(clientTimeout, ChronoUnit.MILLIS)).block();
     }
 }
