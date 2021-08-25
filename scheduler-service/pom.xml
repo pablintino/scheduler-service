@@ -135,8 +135,9 @@
                             <images>
                                 <image>
                                     <name>postgres:13.4</name>
-                                    <alias>it-database</alias>
+                                    <alias>database</alias>
                                     <run>
+                                        <containerNamePattern>scheduler_it_test_%a</containerNamePattern>
                                         <ports>
                                             <port>${postgres.port}:5432</port>
                                         </ports>
@@ -153,8 +154,9 @@
                                 </image>
                                 <image>
                                     <name>rabbitmq:3-management</name>
-                                    <alias>it-rabbitmq</alias>
+                                    <alias>rabbitmq</alias>
                                     <run>
+                                        <containerNamePattern>scheduler_it_test_%a</containerNamePattern>
                                         <ports>
                                             <port>${rabbitmq.ui.port}:15672</port>
                                             <port>${rabbitmq.broker.port}:5672</port>
@@ -167,7 +169,6 @@
                                             </http>
                                             <time>20000</time>
                                         </wait>
-
                                     </run>
                                 </image>
                             </images>

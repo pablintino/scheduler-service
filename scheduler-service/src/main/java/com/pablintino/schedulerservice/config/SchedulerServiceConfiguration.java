@@ -7,7 +7,8 @@ import org.springframework.context.annotation.Configuration;
 @ComponentScan(
         basePackages = {
                 "com.pablintino.schedulerservice.services",
-                "com.pablintino.schedulerservice.rest"
+                "com.pablintino.schedulerservice.rest",
+                "com.pablintino.schedulerservice.quartz"
         },
         basePackageClasses = SchedulerServiceConfiguration.class
 )

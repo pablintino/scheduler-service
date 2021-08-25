@@ -6,6 +6,7 @@ import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.Task;
 import com.pablintino.schedulerservice.services.ISchedulingService;
 import com.pablintino.schedulerservice.services.mappers.ISchedulingDtoMapper;
+import com.pablintino.services.commons.exceptions.ResourceNotFoundHttpServiceException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,7 +44,10 @@ public class SchedulesController {
     @GetMapping("/schedules/{key}/{id}")
     ResponseEntity<ScheduleTaskDto> getSchedule(@PathVariable("key") String key, @PathVariable("id") String id) {
         Task task = schedulingService.getTask(key, id);
-        return new ResponseEntity(task, task != null ? HttpStatus.OK : HttpStatus.NOT_FOUND);
+        if (task == null) {
+            throw new ResourceNotFoundHttpServiceException("Schedule task with key " + key + " and id " + id + " was not found");
+        }
+        return new ResponseEntity(schedulingDtoMapper.mapTasktoDto(task), HttpStatus.OK);
     }
 
     @DeleteMapping("/schedules/{key}/{id}")
