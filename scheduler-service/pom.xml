@@ -160,9 +160,6 @@
                                             <name>postgres.port</name>
                                         </port>
                                         <port>
-                                            <name>rabbitmq.ui.port</name>
-                                        </port>
-                                        <port>
                                             <name>rabbitmq.broker.port</name>
                                         </port>
                                     </ports>
@@ -211,15 +208,10 @@
                                     <run>
                                         <containerNamePattern>scheduler_it_test_%a_${timestamp-unique-id}</containerNamePattern>
                                         <ports>
-                                            <port>${rabbitmq.ui.port}:15672</port>
                                             <port>${rabbitmq.broker.port}:5672</port>
                                         </ports>
                                         <wait>
-                                            <http>
-                                                <url>http://${rabbitmq.host}:${rabbitmq.ui.port}</url>
-                                                <method>GET</method>
-                                                <status>200..399</status>
-                                            </http>
+                                            <log>Server startup complete;</log>
                                             <time>20000</time>
                                         </wait>
                                     </run>
