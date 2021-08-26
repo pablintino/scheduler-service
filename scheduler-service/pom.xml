@@ -74,6 +74,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>commons-validator</groupId>
+            <artifactId>commons-validator</artifactId>
+            <version>1.7</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -120,6 +129,22 @@
                         </executions>
                     </plugin>
                     <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>timestamp-property</id>
+                                <goals>
+                                    <goal>timestamp-property</goal>
+                                </goals>
+                                <configuration>
+                                    <name>timestamp-unique-id</name>
+                                    <pattern>yyyyMMdd-HHmmssSSS</pattern>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
                         <groupId>org.sonatype.plugins</groupId>
                         <artifactId>port-allocator-maven-plugin</artifactId>
                         <version>1.2</version>
@@ -146,27 +171,21 @@
                         </executions>
                     </plugin>
                     <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>timestamp-property</id>
-                                <goals>
-                                    <goal>timestamp-property</goal>
-                                </goals>
-                                <configuration>
-                                    <name>timestamp-unique-id</name>
-                                    <pattern>yyyyMMdd-HHmmssSSS</pattern>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
                         <groupId>io.fabric8</groupId>
                         <artifactId>docker-maven-plugin</artifactId>
                         <version>0.33.0</version>
                         <configuration>
                             <images>
+                                <image>
+                                    <name>pablintino/scheduler-service</name>
+                                    <alias>scheduler-image</alias>
+                                    <build>
+                                        <dockerFileDir>${project.basedir}</dockerFileDir>
+                                        <tags>
+                                            <tag>snapshot-${timestamp-unique-id}</tag>
+                                        </tags>
+                                    </build>
+                                </image>
                                 <image>
                                     <name>postgres:13.4</name>
                                     <alias>database</alias>
@@ -208,6 +227,13 @@
                             </images>
                         </configuration>
                         <executions>
+                            <execution>
+                                <id>prepare-image</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                            </execution>
                             <execution>
                                 <id>prepare-it-database</id>
                                 <phase>pre-integration-test</phase>

@@ -115,7 +115,5 @@ class CallbackJobIT {
                 .build();
 
         scheduler.scheduleJob(job, trigger);
-
-
     }
 }
