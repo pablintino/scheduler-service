@@ -37,10 +37,10 @@ public class CallbackServiceTest {
         ScheduleEventMetadata scheduleEventMetadata = new ScheduleEventMetadata();
         scheduleEventMetadata.setAttempt(0);
         scheduleEventMetadata.setTriggerTime(Instant.now());
-        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, scheduleEventMetadata);
+        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP);
 
         /** Call the service to enqueue the AMPQ message */
-        callbackService.executeCallback(schedulerJobData, map);
+        callbackService.executeCallback(schedulerJobData, map, scheduleEventMetadata);
 
         /** Verify the expected enqueued data */
         AmqpCallbackMessage expectedMessage = new AmqpCallbackMessage(DUMMY_ID_NAME, DUMMY_KEY_NAME, map.getWrappedMap(), scheduleEventMetadata.getTriggerTime().toEpochMilli(), scheduleEventMetadata.getAttempt());
@@ -57,13 +57,14 @@ public class CallbackServiceTest {
         ScheduleEventMetadata scheduleEventMetadata = new ScheduleEventMetadata();
         scheduleEventMetadata.setAttempt(0);
         scheduleEventMetadata.setTriggerTime(Instant.now());
-        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, scheduleEventMetadata);
+        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP);
 
         /** Simulate an exception thrown while sending the callback message */
         Mockito.doThrow(new AmqpException("test exception")).when(rabbitTemplate).convertAndSend(Mockito.anyString(), Mockito.anyString(), Mockito.any(AmqpCallbackMessage.class));
 
+        /** Assert that the exception is not replaced or masquerade with any other one */
         Assertions.assertThrows(AmqpException.class, () -> {
-            callbackService.executeCallback(schedulerJobData, map);
+            callbackService.executeCallback(schedulerJobData, map, scheduleEventMetadata);
         });
     }
 }

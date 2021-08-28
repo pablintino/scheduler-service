@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
+import java.time.Instant;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -36,11 +37,19 @@ class CallbackServiceAMQPIntegrationIT {
 	void simpleSendOK() throws InterruptedException {
 		JobDataMap map = new JobDataMap();
 		map.put("test-key", "test");
-		SchedulerJobData schedulerJobData = new SchedulerJobData("test", AmqpTestIntegrationConfiguration.QUEUE_KEY, null, CallbackType.AMQP, new ScheduleEventMetadata());
-		callbackService.executeCallback(schedulerJobData, map);
+		SchedulerJobData schedulerJobData = new SchedulerJobData("test", AmqpTestIntegrationConfiguration.QUEUE_KEY, null, CallbackType.AMQP);
+		ScheduleEventMetadata scheduleEventMetadata = new ScheduleEventMetadata();
+		scheduleEventMetadata.setAttempt(1);
+		scheduleEventMetadata.setTriggerTime(Instant.now());
+		callbackService.executeCallback(schedulerJobData, map, scheduleEventMetadata);
 
 		AmqpCallbackMessage message = messageQueue.poll(10, TimeUnit.SECONDS);
 		Assertions.assertNotNull(message);
+		Assertions.assertEquals(schedulerJobData.key(), message.getKey());
+		Assertions.assertEquals(schedulerJobData.taskId(), message.getId());
+		Assertions.assertEquals(map.getWrappedMap(), message.getDataMap());
+		Assertions.assertEquals(scheduleEventMetadata.getAttempt(), message.getNotificationAttempt());
+		Assertions.assertEquals(scheduleEventMetadata.getTriggerTime().toEpochMilli(), message.getTriggerTime());
 	}
 
 	@RabbitListener(queues={AmqpTestIntegrationConfiguration.QUEUE_KEY})

@@ -10,6 +10,7 @@ import com.pablintino.schedulerservice.models.Task;
 import org.quartz.JobDataMap;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -18,6 +19,8 @@ import java.util.stream.Collectors;
 public class JobParamsEncoder implements IJobParamsEncoder {
 
     private static final String SCHEDULER_JOB_PROPERTY_NAME = "__sch-props";
+    private static final String SCHEDULER_JOB_FIRE_TIME = "__sch-fire-time";
+    private static final String SCHEDULER_JOB_ATTEMPT = "__sch-attempt";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -28,8 +31,7 @@ public class JobParamsEncoder implements IJobParamsEncoder {
                 task.id(),
                 task.key(),
                 endpoint.callbackUrl(),
-                endpoint.callbackType(),
-                new ScheduleEventMetadata()
+                endpoint.callbackType()
         );
 
         try {
@@ -40,12 +42,26 @@ public class JobParamsEncoder implements IJobParamsEncoder {
     }
 
     @Override
-    public void encodeUpdateJobParameters(JobDataMap jobDataMap, SchedulerJobData schedulerJobData) {
-        try {
-            jobDataMap.put(SCHEDULER_JOB_PROPERTY_NAME, objectMapper.writeValueAsString(schedulerJobData));
-        } catch (JsonProcessingException ex) {
-            throw new SchedulerValidationException("Cannot create internal json datamap", ex);
+    public void encodeUpdateSchedulerEventMetadata(JobDataMap jobDataMap, ScheduleEventMetadata scheduleEventMetadata) {
+        if(scheduleEventMetadata.getTriggerTime() != null){
+            jobDataMap.putAsString(SCHEDULER_JOB_FIRE_TIME, scheduleEventMetadata.getTriggerTime().toEpochMilli());
         }
+        jobDataMap.putAsString(SCHEDULER_JOB_ATTEMPT, scheduleEventMetadata.getAttempt());
+    }
+
+    @Override
+    public ScheduleEventMetadata extractDecodeSchedulerEventMetadata(JobDataMap jobDataMap) {
+        ScheduleEventMetadata scheduleEventMetadata = new ScheduleEventMetadata();
+
+        if(jobDataMap.containsKey(SCHEDULER_JOB_FIRE_TIME)){
+            scheduleEventMetadata.setTriggerTime(Instant.ofEpochMilli(jobDataMap.getLongFromString(SCHEDULER_JOB_FIRE_TIME)));
+        }
+        if(jobDataMap.containsKey(SCHEDULER_JOB_ATTEMPT)){
+            scheduleEventMetadata.setAttempt(jobDataMap.getIntegerFromString(SCHEDULER_JOB_ATTEMPT));
+        }
+        jobDataMap.remove(SCHEDULER_JOB_FIRE_TIME);
+        jobDataMap.remove(SCHEDULER_JOB_ATTEMPT);
+        return scheduleEventMetadata;
     }
 
     @Override

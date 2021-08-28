@@ -91,7 +91,7 @@ class CallbackJobIT {
         Assertions.assertNotNull(jobExecution);
         Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
         DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.jobData(), callbackCallEntry.jobDataMap(), callbackCallEntry.instant());
+        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.jobData(), callbackCallEntry.jobDataMap(), callbackCallEntry.scheduleEventMetadata().getTriggerTime());
 
     }
 
@@ -112,7 +112,7 @@ class CallbackJobIT {
         Assertions.assertNotNull(jobExecution);
         Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
         DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.jobData(), callbackCallEntry.jobDataMap(), callbackCallEntry.instant());
+        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.jobData(), callbackCallEntry.jobDataMap(), callbackCallEntry.scheduleEventMetadata().getTriggerTime());
 
         Assertions.assertEquals(0, listener.getExecutions().size());
         Assertions.assertEquals(false, jobExecution.ex().refireImmediately());

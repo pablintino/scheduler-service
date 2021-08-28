@@ -68,12 +68,12 @@ public class DummyTasksProvider {
         Assertions.assertEquals(retries + 1, executions.size());
         for(int index = 0; index < executions.size(); index++){
             DummyCallbackService.CallbackCallEntry currentEntry = executions.get(index);
-            validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.jobData(), currentEntry.instant());
-            Assertions.assertEquals(index + 1, currentEntry.jobData().eventMetadata().getAttempt());
+            validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.jobData(), currentEntry.scheduleEventMetadata().getTriggerTime());
+            Assertions.assertEquals(index + 1, currentEntry.scheduleEventMetadata().getAttempt());
             if(index > 0){
                 DummyCallbackService.CallbackCallEntry previousEntry = executions.get(index - 1);
-                Instant expectedRetriggerTime = previousEntry.instant().plus(attemptsDelay, ChronoUnit.MILLIS);
-                Instant retriggerInstant = currentEntry.instant();
+                Instant expectedRetriggerTime = previousEntry.scheduleEventMetadata().getTriggerTime().plus(attemptsDelay, ChronoUnit.MILLIS);
+                Instant retriggerInstant = currentEntry.scheduleEventMetadata().getTriggerTime();
                 if(expectedRetriggerTime.plus(50, ChronoUnit.MILLIS).isBefore(retriggerInstant) || expectedRetriggerTime.minus(50, ChronoUnit.MILLIS).isAfter(retriggerInstant)){
                     Assertions.fail("Retrigger instant of a reattempt is out of time");
                 }

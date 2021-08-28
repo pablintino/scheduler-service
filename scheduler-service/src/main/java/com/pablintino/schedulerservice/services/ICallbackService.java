@@ -6,5 +6,5 @@ import org.quartz.JobDataMap;
 
 public interface ICallbackService {
 
-    void executeCallback(SchedulerJobData jobData, JobDataMap jobDataMap);
+    void executeCallback(SchedulerJobData jobData, JobDataMap jobDataMap, ScheduleEventMetadata eventMetadata);
 }

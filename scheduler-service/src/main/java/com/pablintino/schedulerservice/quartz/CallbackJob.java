@@ -1,6 +1,7 @@
 package com.pablintino.schedulerservice.quartz;
 
 import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
+import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.quartz.annotations.IReeschedulableAnnotationResolver;
 import com.pablintino.schedulerservice.services.ICallbackService;
@@ -11,15 +12,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Date;
 
 @Slf4j
 @DisallowConcurrentExecution
 @PersistJobDataAfterExecution
 public class CallbackJob implements Job {
-
-
-    private static final String ATTEMPT_COUNTER_KEY = "__failure_attempts";
 
     private ICallbackService callbackService;
     private IJobParamsEncoder jobParamsEncoder;
@@ -31,16 +31,22 @@ public class CallbackJob implements Job {
     @Override
     public void execute(JobExecutionContext context) throws JobExecutionException {
         log.debug("Job " + context.getJobDetail() + " starts its execution");
-        SchedulerJobData jobData = null;
+        ScheduleEventMetadata scheduleEventMetadata = null;
         try {
-            JobDataMap jobDataMap = context.getMergedJobDataMap();
-            jobData = jobParamsEncoder.extractDecodeJobParameters(jobDataMap);
-            callbackService.executeCallback(jobData, jobDataMap);
-        }catch (SchedulerValidationException schedulerValidationException){
+            JobDataMap copyJobDataMap = new JobDataMap(context.getJobDetail().getJobDataMap());
+            scheduleEventMetadata = jobParamsEncoder.extractDecodeSchedulerEventMetadata(copyJobDataMap);
+            SchedulerJobData jobData = jobParamsEncoder.extractDecodeJobParameters(copyJobDataMap);
+            scheduleEventMetadata.setTriggerTime(ZonedDateTime.now(ZoneOffset.UTC).toInstant());
+            callbackService.executeCallback(jobData, copyJobDataMap, scheduleEventMetadata);
+        } catch (SchedulerValidationException schedulerValidationException) {
             log.error("Unable to decode job parameters. Canceling job " + context.getJobDetail().getKey(), schedulerValidationException);
             throw createUnrecoverableException(schedulerValidationException);
         } catch (Exception ex) {
-            manageFailure(ex, context, jobData);
+            manageFailure(ex, context, scheduleEventMetadata);
+        } finally {
+            if (scheduleEventMetadata != null) {
+                jobParamsEncoder.encodeUpdateSchedulerEventMetadata(context.getJobDetail().getJobDataMap(), scheduleEventMetadata);
+            }
         }
         log.debug("Job " + context.getJobDetail() + " finished its execution");
     }
@@ -70,10 +76,10 @@ public class CallbackJob implements Job {
         this.retrialDelay = retrialDelay;
     }
 
-    private void manageFailure(Exception ex, JobExecutionContext jobExecutionContext, SchedulerJobData schedulerJobData) throws JobExecutionException {
+    private void manageFailure(Exception ex, JobExecutionContext jobExecutionContext, ScheduleEventMetadata scheduleEventMetadata) throws JobExecutionException {
         if (reeschedulableAnnotationResolver.getAnnotatedTypes().stream().anyMatch(exType -> exType.isAssignableFrom(ex.getClass()))) {
             try {
-                int attemptNumber = getIncrementJobAttempt(jobExecutionContext, schedulerJobData);
+                int attemptNumber = getIncrementJobAttempt(scheduleEventMetadata);
                 if (attemptNumber <= retrialAttempts) {
                     Trigger trigger = TriggerBuilder
                             .newTrigger()
@@ -88,7 +94,7 @@ public class CallbackJob implements Job {
 
                     jobExecutionContext.getScheduler().rescheduleJob(jobExecutionContext.getTrigger().getKey(), trigger);
                     throw new JobExecutionException(ex, false);
-                }else{
+                } else {
                     log.error("Exception in job with already consumed reattempts. Discarding job " + jobExecutionContext.getJobDetail().getKey());
                 }
             } catch (Exception intEx) {
@@ -100,21 +106,18 @@ public class CallbackJob implements Job {
         throw createUnrecoverableException(ex);
     }
 
-    private int getIncrementJobAttempt(JobExecutionContext jobExecutionContext, SchedulerJobData schedulerJobData) throws JobExecutionException {
-        try {
-            int attempts = schedulerJobData.eventMetadata().getAttempt() + 1;
-            schedulerJobData.eventMetadata().setAttempt(attempts);
-            jobParamsEncoder.encodeUpdateJobParameters(jobExecutionContext.getJobDetail().getJobDataMap(), schedulerJobData);
+    private int getIncrementJobAttempt(ScheduleEventMetadata scheduleEventMetadata) throws JobExecutionException {
+        if (scheduleEventMetadata != null && scheduleEventMetadata.getAttempt() >= 0) {
+            int attempts = scheduleEventMetadata.getAttempt() + 1;
+            scheduleEventMetadata.setAttempt(attempts);
             return attempts;
-        } catch (Exception ex) {
-            log.error("Error retrieving job remaining attempts. Canceling job " + jobExecutionContext.getJobDetail().getKey(), ex);
-            throw createUnrecoverableException(ex);
         }
+        throw createUnrecoverableException(null);
     }
 
-    private static String getRetryTriggerName(String currentName, int attempt){
-        int p=currentName.lastIndexOf("_retry");
-        if(p >= 0){
+    private static String getRetryTriggerName(String currentName, int attempt) {
+        int p = currentName.lastIndexOf("_retry");
+        if (p >= 0) {
             return currentName.substring(0, p) + "_retry_" + attempt;
         }
         return currentName + "_retry_" + attempt;

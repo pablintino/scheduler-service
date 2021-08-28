@@ -3,6 +3,7 @@ package com.pablintino.schedulerservice.services;
 import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
 import com.pablintino.schedulerservice.models.CallbackType;
 
+import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import org.quartz.JobDataMap;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -24,22 +25,22 @@ public class CallbackService implements ICallbackService {
     }
 
     @Override
-    public void executeCallback(SchedulerJobData jobData, JobDataMap jobDataMap) {
+    public void executeCallback(SchedulerJobData jobData, JobDataMap jobDataMap, ScheduleEventMetadata scheduleEventMetadata) {
         if (jobData.type() == CallbackType.AMQP) {
-            executeAmqpCallback(jobData, jobDataMap);
+            executeAmqpCallback(jobData, jobDataMap, scheduleEventMetadata);
         } else {
             // TODO Implement remaining callback types
             throw new UnsupportedOperationException("Callback type not implemented");
         }
     }
 
-    private void executeAmqpCallback(SchedulerJobData schedulerJobData, JobDataMap jobDataMap) {
+    private void executeAmqpCallback(SchedulerJobData schedulerJobData, JobDataMap jobDataMap, ScheduleEventMetadata scheduleEventMetadata) {
         AmqpCallbackMessage message = new AmqpCallbackMessage(
                 schedulerJobData.taskId(),
                 schedulerJobData.key(),
                 jobDataMap.getWrappedMap(),
-                schedulerJobData.eventMetadata().getTriggerTime().toEpochMilli(),
-                schedulerJobData.eventMetadata().getAttempt()
+                scheduleEventMetadata.getTriggerTime().toEpochMilli(),
+                scheduleEventMetadata.getAttempt()
         );
         rabbitTemplate.convertAndSend(exchangeName, schedulerJobData.key(), message);
     }
