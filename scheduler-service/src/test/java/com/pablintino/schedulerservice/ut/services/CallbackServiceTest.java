@@ -2,6 +2,7 @@ package com.pablintino.schedulerservice.ut.services;
 
 import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
 import com.pablintino.schedulerservice.models.CallbackType;
+import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.services.CallbackService;
 import org.junit.jupiter.api.Assertions;
@@ -31,7 +32,7 @@ public class CallbackServiceTest {
         /** Prepare the dummy data to be sent */
         JobDataMap map = new JobDataMap();
         map.put("test-key", "test");
-        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP);
+        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, new ScheduleEventMetadata());
 
         /** Call the service to enqueue the AMPQ message */
         callbackService.executeCallback(schedulerJobData, map);
@@ -48,7 +49,7 @@ public class CallbackServiceTest {
         /** Prepare the dummy data to be sent */
         JobDataMap map = new JobDataMap();
         map.put("test-key", "test");
-        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP);
+        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, new ScheduleEventMetadata());
 
         /** Simulate an exception thrown while sending the callback message */
         Mockito.doThrow(new AmqpException("test exception")).when(rabbitTemplate).convertAndSend(Mockito.anyString(), Mockito.anyString(), Mockito.any(AmqpCallbackMessage.class));

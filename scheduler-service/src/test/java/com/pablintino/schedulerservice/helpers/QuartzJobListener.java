@@ -1,4 +1,4 @@
-package com.pablintino.schedulerservice.it.helpers;
+package com.pablintino.schedulerservice.helpers;
 
 import lombok.Getter;
 import org.junit.jupiter.api.Assertions;
@@ -6,6 +6,9 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.JobListener;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -44,5 +47,23 @@ public class QuartzJobListener implements JobListener {
         } catch (InterruptedException e) {
             return Assertions.fail("Exception while waiting job execution");
         }
+    }
+
+    public List<JobExecutionEntry> waitJobExecutions(int count, long millis){
+        long remaining = millis;
+        List<JobExecutionEntry> entries = new ArrayList<>();
+        try {
+            do{
+                Instant start = Instant.now();
+                JobExecutionEntry jobExecutionEntry = executions.poll(remaining, TimeUnit.MILLISECONDS);
+                if(jobExecutionEntry!=null){
+                    entries.add(jobExecutionEntry);
+                }
+                remaining -= Instant.now().toEpochMilli() - start.toEpochMilli();
+            }while (remaining>0 && entries.size() < count);
+        } catch (InterruptedException e) {
+            return Assertions.fail("Exception while waiting job execution");
+        }
+        return entries;
     }
 }

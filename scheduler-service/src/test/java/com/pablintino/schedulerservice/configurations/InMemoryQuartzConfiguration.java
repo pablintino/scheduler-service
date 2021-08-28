@@ -1,8 +1,7 @@
-package com.pablintino.schedulerservice.it.configurations;
+package com.pablintino.schedulerservice.configurations;
 
 import com.pablintino.schedulerservice.config.scheduler.SchedulerJobFactory;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
 import java.io.IOException;

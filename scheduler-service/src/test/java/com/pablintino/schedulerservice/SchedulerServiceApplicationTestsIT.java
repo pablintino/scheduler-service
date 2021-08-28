@@ -1,4 +1,4 @@
-package com.pablintino.schedulerservice.it;
+package com.pablintino.schedulerservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

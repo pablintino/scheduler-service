@@ -1,8 +1,9 @@
-package com.pablintino.schedulerservice.it;
+package com.pablintino.schedulerservice;
 
 import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
-import com.pablintino.schedulerservice.it.configurations.AmqpTestIntegrationConfiguration;
+import com.pablintino.schedulerservice.configurations.AmqpTestIntegrationConfiguration;
 import com.pablintino.schedulerservice.models.CallbackType;
+import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.services.ICallbackService;
 import org.junit.jupiter.api.Assertions;
@@ -35,7 +36,7 @@ class CallbackServiceAMQPIntegrationIT {
 	void simpleSendOK() throws InterruptedException {
 		JobDataMap map = new JobDataMap();
 		map.put("test-key", "test");
-		SchedulerJobData schedulerJobData = new SchedulerJobData("test", AmqpTestIntegrationConfiguration.QUEUE_KEY, null, CallbackType.AMQP);
+		SchedulerJobData schedulerJobData = new SchedulerJobData("test", AmqpTestIntegrationConfiguration.QUEUE_KEY, null, CallbackType.AMQP, new ScheduleEventMetadata());
 		callbackService.executeCallback(schedulerJobData, map);
 
 		AmqpCallbackMessage message = messageQueue.poll(10, TimeUnit.SECONDS);

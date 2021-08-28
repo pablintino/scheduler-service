@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.models.Endpoint;
+import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.models.Task;
 import org.quartz.JobDataMap;
@@ -27,11 +28,21 @@ public class JobParamsEncoder implements IJobParamsEncoder {
                 task.id(),
                 task.key(),
                 endpoint.callbackUrl(),
-                endpoint.callbackType()
+                endpoint.callbackType(),
+                new ScheduleEventMetadata()
         );
 
         try {
             return Collections.singletonMap(SCHEDULER_JOB_PROPERTY_NAME, objectMapper.writeValueAsString(jobData));
+        } catch (JsonProcessingException ex) {
+            throw new SchedulerValidationException("Cannot create internal json datamap", ex);
+        }
+    }
+
+    @Override
+    public void encodeUpdateJobParameters(JobDataMap jobDataMap, SchedulerJobData schedulerJobData) {
+        try {
+            jobDataMap.put(SCHEDULER_JOB_PROPERTY_NAME, objectMapper.writeValueAsString(schedulerJobData));
         } catch (JsonProcessingException ex) {
             throw new SchedulerValidationException("Cannot create internal json datamap", ex);
         }
