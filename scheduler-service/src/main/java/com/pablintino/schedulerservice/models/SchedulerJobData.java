@@ -8,5 +8,6 @@ public record SchedulerJobData(String taskId, String key, String callbackUrl, Ca
         Assert.hasLength(key, "key cannot be null or empty");
         Assert.notNull(type, "type cannot be null");
         Assert.notNull(eventMetadata, "eventMetadata cannot be null");
+        Assert.notNull(eventMetadata.getTriggerTime(), "eventMetadata.triggerTime cannot be null");
     }
 }

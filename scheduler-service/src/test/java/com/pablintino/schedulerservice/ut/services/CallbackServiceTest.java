@@ -15,6 +15,8 @@ import org.quartz.JobDataMap;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import java.time.Instant;
+
 @ExtendWith(MockitoExtension.class)
 public class CallbackServiceTest {
 
@@ -32,13 +34,16 @@ public class CallbackServiceTest {
         /** Prepare the dummy data to be sent */
         JobDataMap map = new JobDataMap();
         map.put("test-key", "test");
-        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, new ScheduleEventMetadata());
+        ScheduleEventMetadata scheduleEventMetadata = new ScheduleEventMetadata();
+        scheduleEventMetadata.setAttempt(0);
+        scheduleEventMetadata.setTriggerTime(Instant.now());
+        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, scheduleEventMetadata);
 
         /** Call the service to enqueue the AMPQ message */
         callbackService.executeCallback(schedulerJobData, map);
 
         /** Verify the expected enqueued data */
-        AmqpCallbackMessage expectedMessage = new AmqpCallbackMessage(DUMMY_ID_NAME, DUMMY_KEY_NAME, map.getWrappedMap());
+        AmqpCallbackMessage expectedMessage = new AmqpCallbackMessage(DUMMY_ID_NAME, DUMMY_KEY_NAME, map.getWrappedMap(), scheduleEventMetadata.getTriggerTime().toEpochMilli(), scheduleEventMetadata.getAttempt());
         Mockito.verify(rabbitTemplate, Mockito.times(1)).convertAndSend(DUMMY_EXCHANGE_NAME, DUMMY_KEY_NAME, expectedMessage);
     }
 
@@ -49,7 +54,10 @@ public class CallbackServiceTest {
         /** Prepare the dummy data to be sent */
         JobDataMap map = new JobDataMap();
         map.put("test-key", "test");
-        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, new ScheduleEventMetadata());
+        ScheduleEventMetadata scheduleEventMetadata = new ScheduleEventMetadata();
+        scheduleEventMetadata.setAttempt(0);
+        scheduleEventMetadata.setTriggerTime(Instant.now());
+        SchedulerJobData schedulerJobData = new SchedulerJobData(DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, scheduleEventMetadata);
 
         /** Simulate an exception thrown while sending the callback message */
         Mockito.doThrow(new AmqpException("test exception")).when(rabbitTemplate).convertAndSend(Mockito.anyString(), Mockito.anyString(), Mockito.any(AmqpCallbackMessage.class));

@@ -2,7 +2,7 @@ package com.pablintino.schedulerservice.services;
 
 import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
 import com.pablintino.schedulerservice.models.CallbackType;
-import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
+
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import org.quartz.JobDataMap;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -37,7 +37,9 @@ public class CallbackService implements ICallbackService {
         AmqpCallbackMessage message = new AmqpCallbackMessage(
                 schedulerJobData.taskId(),
                 schedulerJobData.key(),
-                jobDataMap.getWrappedMap()
+                jobDataMap.getWrappedMap(),
+                schedulerJobData.eventMetadata().getTriggerTime().toEpochMilli(),
+                schedulerJobData.eventMetadata().getAttempt()
         );
         rabbitTemplate.convertAndSend(exchangeName, schedulerJobData.key(), message);
     }
