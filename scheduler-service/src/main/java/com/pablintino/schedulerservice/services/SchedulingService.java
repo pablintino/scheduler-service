@@ -91,7 +91,7 @@ public class SchedulingService implements ISchedulingService {
                         jobKey.getGroup(),
                         ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
                         cronExpression,
-                        jobParamsEncoder.removeJobParameters(jobDetail.getJobDataMap().getWrappedMap())
+                        jobParamsEncoder.removeInternalProperties(jobDetail.getJobDataMap().getWrappedMap())
                 );
                 return task;
             }
@@ -101,41 +101,41 @@ public class SchedulingService implements ISchedulingService {
     }
 
     private Trigger prepareNewTrigger(Task task) throws SchedulerException {
-        String triggerName = TRIGGER_NAME_PREFIX + task.id();
+        String triggerName = TRIGGER_NAME_PREFIX + task.getId();
 
-        if (task.triggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))) {
+        if (task.getTriggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))) {
             throw new SchedulerValidationException("Task time initial time is a past time");
         }
 
-        if (triggerExists(triggerName, task.key())) {
-            throw new SchedulerValidationException("Task " + task.id() + " has been already scheduled");
+        if (triggerExists(triggerName, task.getKey())) {
+            throw new SchedulerValidationException("Task " + task.getId() + " has been already scheduled");
         }
 
         TriggerBuilder<Trigger> builder = TriggerBuilder
                 .newTrigger()
-                .withIdentity(triggerName, task.key())
-                .startAt(Date.from(task.triggerTime().toInstant()));
+                .withIdentity(triggerName, task.getKey())
+                .startAt(Date.from(task.getTriggerTime().toInstant()));
 
-        if (StringUtils.isEmpty(task.cronExpression())) {
+        if (StringUtils.isEmpty(task.getCronExpression())) {
             return builder.withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
         }
-        return builder.withSchedule(CronScheduleBuilder.cronSchedule(task.cronExpression())).build();
+        return builder.withSchedule(CronScheduleBuilder.cronSchedule(task.getCronExpression())).build();
     }
 
     private JobDetail prepareNewJob(Task task, Endpoint endpoint) throws SchedulerException {
-        String jobName = JOB_NAME_PREFIX + task.id();
+        String jobName = JOB_NAME_PREFIX + task.getId();
 
-        if (jobExists(jobName, task.key())) {
-            throw new SchedulingException("Task " + task.id() + " has been already scheduled");
+        if (jobExists(jobName, task.getKey())) {
+            throw new SchedulingException("Task " + task.getId() + " has been already scheduled");
         }
 
-        if (endpoint.callbackType() == CallbackType.HTTP && !UrlValidator.getInstance().isValid(endpoint.callbackUrl())) {
+        if (endpoint.getCallbackType() == CallbackType.HTTP && !UrlValidator.getInstance().isValid(endpoint.getCallbackUrl())) {
             throw new SchedulerValidationException("Endpoint of type HTTP contains an invalid URL");
         }
 
         return JobBuilder
                 .newJob(CallbackJob.class)
-                .withIdentity(jobName, task.key())
+                .withIdentity(jobName, task.getKey())
                 .setJobData(createDataMap(task, endpoint))
                 .build();
     }
@@ -153,7 +153,7 @@ public class SchedulingService implements ISchedulingService {
     }
 
     private JobDataMap createDataMap(Task task, Endpoint endpoint) {
-        if (task.taskData() != null && task.taskData().values().stream()
+        if (task.getTaskData() != null && task.getTaskData().values().stream()
                 .anyMatch(o ->
                         !ClassUtils.isPrimitiveOrWrapper(o.getClass()) &&
                                 !String.class.equals(o.getClass()))
@@ -162,8 +162,8 @@ public class SchedulingService implements ISchedulingService {
         }
 
         JobDataMap dataMap = new JobDataMap();
-        if (task.taskData() != null) {
-            dataMap.putAll(task.taskData());
+        if (task.getTaskData() != null) {
+            dataMap.putAll(task.getTaskData());
         }
         dataMap.putAll(jobParamsEncoder.encodeJobParameters(task, endpoint));
         return dataMap;

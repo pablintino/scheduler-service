@@ -46,7 +46,7 @@ public class DummyTasksProvider {
 
         JobDetail job = JobBuilder
                 .newJob(CallbackJob.class)
-                .withIdentity(dummyTask.id(), dummyTask.key())
+                .withIdentity(dummyTask.getId(), dummyTask.getKey())
                 .setJobData(dataMap)
                 .build();
 
@@ -68,12 +68,12 @@ public class DummyTasksProvider {
         Assertions.assertEquals(retries + 1, executions.size());
         for(int index = 0; index < executions.size(); index++){
             DummyCallbackService.CallbackCallEntry currentEntry = executions.get(index);
-            validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.jobData(), currentEntry.scheduleEventMetadata().getTriggerTime());
-            Assertions.assertEquals(index + 1, currentEntry.scheduleEventMetadata().getAttempt());
+            validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.getJobData(), currentEntry.getScheduleEventMetadata().getTriggerTime());
+            Assertions.assertEquals(index + 1, currentEntry.getScheduleEventMetadata().getAttempt());
             if(index > 0){
                 DummyCallbackService.CallbackCallEntry previousEntry = executions.get(index - 1);
-                Instant expectedRetriggerTime = previousEntry.scheduleEventMetadata().getTriggerTime().plus(attemptsDelay, ChronoUnit.MILLIS);
-                Instant retriggerInstant = currentEntry.scheduleEventMetadata().getTriggerTime();
+                Instant expectedRetriggerTime = previousEntry.getScheduleEventMetadata().getTriggerTime().plus(attemptsDelay, ChronoUnit.MILLIS);
+                Instant retriggerInstant = currentEntry.getScheduleEventMetadata().getTriggerTime();
                 if(expectedRetriggerTime.plus(50, ChronoUnit.MILLIS).isBefore(retriggerInstant) || expectedRetriggerTime.minus(50, ChronoUnit.MILLIS).isAfter(retriggerInstant)){
                     Assertions.fail("Retrigger instant of a reattempt is out of time");
                 }
@@ -84,14 +84,14 @@ public class DummyTasksProvider {
     private static void validateSimpleValidJobParams(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, Instant callTime){
         validateCommonSchedulerDataParams(dummyTaskDataModels, jobData, callTime);
         // TODO Review this tolerance
-        Assertions.assertTrue(callTime.toEpochMilli() - dummyTaskDataModels.task().triggerTime().toInstant().toEpochMilli() <= 50);
+        Assertions.assertTrue(callTime.toEpochMilli() - dummyTaskDataModels.getTask().getTriggerTime().toInstant().toEpochMilli() <= 50);
     }
 
     private static void validateCommonSchedulerDataParams(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, Instant callTime) {
-        Assertions.assertEquals(dummyTaskDataModels.task().id(), jobData.taskId());
-        Assertions.assertEquals(dummyTaskDataModels.task().key(), jobData.key());
-        Assertions.assertEquals(dummyTaskDataModels.endpoint().callbackUrl(), jobData.callbackUrl());
-        Assertions.assertEquals(dummyTaskDataModels.endpoint().callbackType(), jobData.type());
-        Assertions.assertTrue(dummyTaskDataModels.task().triggerTime().toInstant().isBefore(callTime));
+        Assertions.assertEquals(dummyTaskDataModels.getTask().getId(), jobData.getTaskId());
+        Assertions.assertEquals(dummyTaskDataModels.getTask().getKey(), jobData.getKey());
+        Assertions.assertEquals(dummyTaskDataModels.getEndpoint().getCallbackUrl(), jobData.getCallbackUrl());
+        Assertions.assertEquals(dummyTaskDataModels.getEndpoint().getCallbackType(), jobData.getType());
+        Assertions.assertTrue(dummyTaskDataModels.getTask().getTriggerTime().toInstant().isBefore(callTime));
     }
 }

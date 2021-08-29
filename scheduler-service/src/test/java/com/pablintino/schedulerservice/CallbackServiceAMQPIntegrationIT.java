@@ -45,8 +45,8 @@ class CallbackServiceAMQPIntegrationIT {
 
 		AmqpCallbackMessage message = messageQueue.poll(10, TimeUnit.SECONDS);
 		Assertions.assertNotNull(message);
-		Assertions.assertEquals(schedulerJobData.key(), message.getKey());
-		Assertions.assertEquals(schedulerJobData.taskId(), message.getId());
+		Assertions.assertEquals(schedulerJobData.getKey(), message.getKey());
+		Assertions.assertEquals(schedulerJobData.getTaskId(), message.getId());
 		Assertions.assertEquals(map.getWrappedMap(), message.getDataMap());
 		Assertions.assertEquals(scheduleEventMetadata.getAttempt(), message.getNotificationAttempt());
 		Assertions.assertEquals(scheduleEventMetadata.getTriggerTime().toEpochMilli(), message.getTriggerTime());

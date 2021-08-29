@@ -1,13 +1,24 @@
 package com.pablintino.schedulerservice.models;
 
+import lombok.Getter;
+import lombok.ToString;
 import org.springframework.util.Assert;
 
 import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-public record Task(String id, String key, ZonedDateTime triggerTime,
-                   String cronExpression, Map<String, Object> taskData) {
+@Getter
+@ToString
+public class Task {
+
+    private final String id;
+    private final String key;
+    private final ZonedDateTime triggerTime;
+    private final String cronExpression;
+
+    @ToString.Exclude
+    private final Map<String, Object> taskData;
 
     public Task(String id, String key, ZonedDateTime triggerTime, String cronExpression,
                 Map<String, Object> taskData) {

@@ -4,18 +4,22 @@ import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.services.ICallbackService;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.quartz.JobDataMap;
 
-import java.time.Instant;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.BiConsumer;
 
 public class DummyCallbackService implements ICallbackService {
 
-
-    public record CallbackCallEntry(SchedulerJobData jobData, JobDataMap jobDataMap, ScheduleEventMetadata scheduleEventMetadata){
+    @Getter
+    @RequiredArgsConstructor
+    public class CallbackCallEntry {
+        private final SchedulerJobData jobData;
+        private final JobDataMap jobDataMap;
+        private final ScheduleEventMetadata scheduleEventMetadata;
     }
 
     @Getter

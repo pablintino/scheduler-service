@@ -28,10 +28,10 @@ public class JobParamsEncoder implements IJobParamsEncoder {
     public Map<String, Object> encodeJobParameters(Task task, Endpoint endpoint) {
 
         SchedulerJobData jobData = new SchedulerJobData(
-                task.id(),
-                task.key(),
-                endpoint.callbackUrl(),
-                endpoint.callbackType()
+                task.getId(),
+                task.getKey(),
+                endpoint.getCallbackUrl(),
+                endpoint.getCallbackType()
         );
 
         try {
@@ -82,11 +82,13 @@ public class JobParamsEncoder implements IJobParamsEncoder {
     }
 
     @Override
-    public Map<String, Object> removeJobParameters(Map<String, Object> jobDataMap) {
+    public Map<String, Object> removeInternalProperties(Map<String, Object> jobDataMap) {
         if(jobDataMap != null){
             Map<String, Object> dataMap = jobDataMap.entrySet().stream()
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
             dataMap.remove(SCHEDULER_JOB_PROPERTY_NAME);
+            dataMap.remove(SCHEDULER_JOB_FIRE_TIME);
+            dataMap.remove(SCHEDULER_JOB_ATTEMPT);
             return dataMap;
         }
         return null;

@@ -77,6 +77,7 @@ public class CallbackJob implements Job {
     }
 
     private void manageFailure(Exception ex, JobExecutionContext jobExecutionContext, ScheduleEventMetadata scheduleEventMetadata) throws JobExecutionException {
+        boolean reescheduled = false;
         if (reeschedulableAnnotationResolver.getAnnotatedTypes().stream().anyMatch(exType -> exType.isAssignableFrom(ex.getClass()))) {
             try {
                 int attemptNumber = getIncrementJobAttempt(scheduleEventMetadata);
@@ -93,7 +94,7 @@ public class CallbackJob implements Job {
                     log.debug("Callback job " + jobExecutionContext.getJobDetail().getKey() + " reschedule attempt " + attemptNumber);
 
                     jobExecutionContext.getScheduler().rescheduleJob(jobExecutionContext.getTrigger().getKey(), trigger);
-                    throw new JobExecutionException(ex, false);
+                    reescheduled = true;
                 } else {
                     log.error("Exception in job with already consumed reattempts. Discarding job " + jobExecutionContext.getJobDetail().getKey());
                 }
@@ -103,7 +104,7 @@ public class CallbackJob implements Job {
         } else {
             log.error("Non recoverable exception during job execution. Discarding job " + jobExecutionContext.getJobDetail().getKey());
         }
-        throw createUnrecoverableException(ex);
+        throw reescheduled ? new JobExecutionException(ex, false) :createUnrecoverableException(ex);
     }
 
     private int getIncrementJobAttempt(ScheduleEventMetadata scheduleEventMetadata) throws JobExecutionException {

@@ -15,6 +15,6 @@ public interface IJobParamsEncoder {
     ScheduleEventMetadata extractDecodeSchedulerEventMetadata(JobDataMap jobDataMap);
 
     SchedulerJobData extractDecodeJobParameters(JobDataMap jobDataMap);
-    Map<String, Object> removeJobParameters(Map<String, Object> jobDataMap);
+    Map<String, Object> removeInternalProperties(Map<String, Object> jobDataMap);
 
 }

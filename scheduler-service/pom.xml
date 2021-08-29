@@ -11,9 +11,6 @@
     <version>0.0.1-SNAPSHOT</version>
     <name>scheduler-service</name>
     <description>Scheduler service for pablintino arq.</description>
-    <properties>
-        <java.version>16</java.version>
-    </properties>
     <dependencies>
         <dependency>
             <groupId>com.pablintino.services</groupId>

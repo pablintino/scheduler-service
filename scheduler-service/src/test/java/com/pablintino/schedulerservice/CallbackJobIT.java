@@ -23,6 +23,7 @@ import org.springframework.test.context.TestPropertySource;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @SpringBootTest()
@@ -85,13 +86,13 @@ class CallbackJobIT {
         scheduler.getListenerManager().addJobListener(listener);
 
         DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        scheduler.scheduleJob(testModels.jobDetail(), testModels.trigger());
+        scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
 
         QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(1500);
         Assertions.assertNotNull(jobExecution);
         Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
         DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.jobData(), callbackCallEntry.jobDataMap(), callbackCallEntry.scheduleEventMetadata().getTriggerTime());
+        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
 
     }
 
@@ -106,17 +107,17 @@ class CallbackJobIT {
         });
 
         DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        scheduler.scheduleJob(testModels.jobDetail(), testModels.trigger());
+        scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
 
         QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(1500);
         Assertions.assertNotNull(jobExecution);
         Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
         DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.jobData(), callbackCallEntry.jobDataMap(), callbackCallEntry.scheduleEventMetadata().getTriggerTime());
+        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
 
         Assertions.assertEquals(0, listener.getExecutions().size());
-        Assertions.assertEquals(false, jobExecution.ex().refireImmediately());
-        Assertions.assertEquals(true, jobExecution.ex().unscheduleAllTriggers());
+        Assertions.assertEquals(false, jobExecution.getEx().refireImmediately());
+        Assertions.assertEquals(true, jobExecution.getEx().unscheduleAllTriggers());
     }
 
     @Test
@@ -132,13 +133,13 @@ class CallbackJobIT {
         Mockito.when(reeschedulableAnnotationResolver.getAnnotatedTypes()).thenReturn(Collections.singleton(RuntimeException.class));
 
         DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        scheduler.scheduleJob(testModels.jobDetail(), testModels.trigger());
+        scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
 
 
         List<QuartzJobListener.JobExecutionEntry> jobExecutions= listener.waitJobExecutions(failureAttempts + 2, Math.round(Math.ceil((failureAttempts + 1)*failureAttemptDelay*1.1)));
         Assertions.assertEquals(failureAttempts + 1, jobExecutions.size());
         Assertions.assertEquals(failureAttempts + 1, dummyCallbackService.getExecutions().size());
 
-        dummyTasksProvider.validateSimpleValidReattemptedJob( testModels, dummyCallbackService.getExecutions().stream().toList(), failureAttempts, failureAttemptDelay);
+        dummyTasksProvider.validateSimpleValidReattemptedJob( testModels, dummyCallbackService.getExecutions().stream().collect(Collectors.toList()), failureAttempts, failureAttemptDelay);
     }
 }

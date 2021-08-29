@@ -43,11 +43,11 @@ public class SchedulingDtoMapper implements ISchedulingDtoMapper {
     @Override
     public ScheduleTaskDto mapTasktoDto(Task task) {
         return new ScheduleTaskDto(
-                task.id(),
-                task.key(),
-                task.triggerTime(),
-                task.cronExpression(),
-                task.taskData()
+                task.getId(),
+                task.getKey(),
+                task.getTriggerTime(),
+                task.getCronExpression(),
+                task.getTaskData()
         );
     }
 }

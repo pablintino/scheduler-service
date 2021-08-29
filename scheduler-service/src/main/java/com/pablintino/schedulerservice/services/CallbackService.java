@@ -1,14 +1,20 @@
 package com.pablintino.schedulerservice.services;
 
 import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
+import com.pablintino.schedulerservice.exceptions.RemoteUnreachableException;
 import com.pablintino.schedulerservice.models.CallbackType;
 
 import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.quartz.JobDataMap;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.net.ConnectException;
 
 @Service
 public class CallbackService implements ICallbackService {
@@ -26,7 +32,7 @@ public class CallbackService implements ICallbackService {
 
     @Override
     public void executeCallback(SchedulerJobData jobData, JobDataMap jobDataMap, ScheduleEventMetadata scheduleEventMetadata) {
-        if (jobData.type() == CallbackType.AMQP) {
+        if (jobData.getType() == CallbackType.AMQP) {
             executeAmqpCallback(jobData, jobDataMap, scheduleEventMetadata);
         } else {
             // TODO Implement remaining callback types
@@ -36,12 +42,24 @@ public class CallbackService implements ICallbackService {
 
     private void executeAmqpCallback(SchedulerJobData schedulerJobData, JobDataMap jobDataMap, ScheduleEventMetadata scheduleEventMetadata) {
         AmqpCallbackMessage message = new AmqpCallbackMessage(
-                schedulerJobData.taskId(),
-                schedulerJobData.key(),
+                schedulerJobData.getTaskId(),
+                schedulerJobData.getKey(),
                 jobDataMap.getWrappedMap(),
                 scheduleEventMetadata.getTriggerTime().toEpochMilli(),
                 scheduleEventMetadata.getAttempt()
         );
-        rabbitTemplate.convertAndSend(exchangeName, schedulerJobData.key(), message);
+
+        try {
+            rabbitTemplate.convertAndSend(exchangeName, schedulerJobData.getKey(), message);
+        }catch (AmqpException ex){
+            Throwable rootCause = ExceptionUtils.getRootCause(ex);
+            if(rootCause != null && !rootCause.equals(ex) && (
+                    IOException.class.isAssignableFrom(rootCause.getClass()) ||
+                    ConnectException.class.isAssignableFrom(rootCause.getClass())
+            )){
+                throw new RemoteUnreachableException(ex);
+            }
+            throw ex;
+        }
     }
 }

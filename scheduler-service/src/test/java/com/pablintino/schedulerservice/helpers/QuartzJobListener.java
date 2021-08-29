@@ -1,6 +1,7 @@
 package com.pablintino.schedulerservice.helpers;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Assertions;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -15,7 +16,11 @@ import java.util.concurrent.TimeUnit;
 
 public class QuartzJobListener implements JobListener {
 
-    public record JobExecutionEntry(JobExecutionContext jobExecutionContext, JobExecutionException ex){
+    @Getter
+    @RequiredArgsConstructor
+    public class JobExecutionEntry {
+        private final JobExecutionContext jobExecutionContext;
+        private final JobExecutionException ex;
     }
 
     @Getter

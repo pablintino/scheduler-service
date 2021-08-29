@@ -24,7 +24,7 @@ public class SchedulesController {
     private final ISchedulingDtoMapper schedulingDtoMapper;
 
     @PostMapping("/schedules")
-    ScheduleRequestDto newScheduleRequest(@Valid @RequestBody ScheduleRequestDto scheduleRequest) {
+    public ScheduleRequestDto newScheduleRequest(@Valid @RequestBody ScheduleRequestDto scheduleRequest) {
 
         Task task = schedulingDtoMapper.mapTaskFromDto(scheduleRequest);
         Endpoint endpoint = schedulingDtoMapper.mapEndpointFromDto(scheduleRequest);
@@ -34,7 +34,7 @@ public class SchedulesController {
     }
 
     @GetMapping("/schedules/{key}")
-    List<ScheduleTaskDto> getSchedulesForKey(@PathVariable("key") String key) {
+    public List<ScheduleTaskDto> getSchedulesForKey(@PathVariable("key") String key) {
         return schedulingService.getTasksForKey(key)
                 .stream()
                 .map(schedulingDtoMapper::mapTasktoDto)
@@ -42,7 +42,7 @@ public class SchedulesController {
     }
 
     @GetMapping("/schedules/{key}/{id}")
-    ResponseEntity<ScheduleTaskDto> getSchedule(@PathVariable("key") String key, @PathVariable("id") String id) {
+    public ResponseEntity<ScheduleTaskDto> getSchedule(@PathVariable("key") String key, @PathVariable("id") String id) {
         Task task = schedulingService.getTask(key, id);
         if (task == null) {
             throw new ResourceNotFoundHttpServiceException("Schedule task with key " + key + " and id " + id + " was not found");
@@ -52,7 +52,7 @@ public class SchedulesController {
 
     @DeleteMapping("/schedules/{key}/{id}")
     @ResponseStatus(value = HttpStatus.NO_CONTENT)
-    void deleteTask(@PathVariable("key") String key, @PathVariable("id") String id) {
+    public void deleteTask(@PathVariable("key") String key, @PathVariable("id") String id) {
         schedulingService.deleteTask(key, id);
     }
 }
