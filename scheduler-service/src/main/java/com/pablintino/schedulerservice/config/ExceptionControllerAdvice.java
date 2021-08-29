@@ -45,7 +45,7 @@ public class ExceptionControllerAdvice {
         Map<String, String> errors = new HashMap<>();
         if (ex.getCause() instanceof MismatchedInputException) {
             String fieldName = ((MismatchedInputException) ex.getCause()).getPath().stream()
-                    .map(MismatchedInputException.Reference::getFieldName)
+                    .map(ef -> ef.getFieldName())
                     .collect(Collectors.joining("."));
             errors.put(fieldName, ExceptionUtils.getRootCause(ex).getMessage());
         }
