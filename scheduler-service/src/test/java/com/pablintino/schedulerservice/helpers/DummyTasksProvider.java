@@ -15,9 +15,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 
 @Component
@@ -25,6 +23,16 @@ import java.util.List;
 public class DummyTasksProvider {
 
     private final IJobParamsEncoder jobParamsEncoder;
+
+
+    public Map<String, Object> createSimpleJobDataMap(){
+        Map<String, Object> dummyMap = new HashMap<>();
+        dummyMap.put("key1-int", 1);
+        dummyMap.put("key1-double", 1.2);
+        dummyMap.put("key1-str", "test");
+        dummyMap.put("key1-bool", true);
+        return dummyMap;
+    }
 
     public DummyTaskDataModels createSimpleValidJob(String name, long triggerTime) {
         Date startDate = Date.from(Instant.now().plusMillis(triggerTime));
@@ -37,12 +45,13 @@ public class DummyTasksProvider {
         Task dummyTask = new Task(name, "it-test",
                 ZonedDateTime.ofInstant(startDate.toInstant(), ZoneOffset.UTC),
                 null,
-                Collections.emptyMap());
+                createSimpleJobDataMap());
 
         Endpoint dummyEndpoint = new Endpoint(CallbackType.AMQP, null);
 
         JobDataMap dataMap = new JobDataMap();
         dataMap.putAll(jobParamsEncoder.encodeJobParameters(dummyTask, dummyEndpoint));
+        dataMap.putAll(dummyTask.getTaskData());
 
         JobDetail job = JobBuilder
                 .newJob(CallbackJob.class)
@@ -51,17 +60,6 @@ public class DummyTasksProvider {
                 .build();
 
         return new DummyTaskDataModels(dummyTask, dummyEndpoint, trigger, job);
-    }
-
-    public void validateSimpleValidJob(DummyTaskDataModels dummyTaskDataModels, JobExecutionContext jobExecutionContext){
-        Assertions.assertNotNull(jobExecutionContext);
-        SchedulerJobData schedulerJobData = jobParamsEncoder.extractDecodeJobParameters(jobExecutionContext.getJobDetail().getJobDataMap());
-        validateSimpleValidJobParams(dummyTaskDataModels, schedulerJobData, jobExecutionContext.getFireTime().toInstant());
-
-    }
-
-    public void validateSimpleValidJob(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, JobDataMap jobDataMap, Instant callTime){
-        validateSimpleValidJobParams(dummyTaskDataModels, jobData, callTime);
     }
 
     public void validateSimpleValidReattemptedJob(DummyTaskDataModels dummyTaskDataModels, List<DummyCallbackService.CallbackCallEntry> executions, int retries, long attemptsDelay){
@@ -81,10 +79,11 @@ public class DummyTasksProvider {
         }
     }
 
-    private static void validateSimpleValidJobParams(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, Instant callTime){
+    public void validateSimpleValidJob(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, JobDataMap jobDataMap, Instant callTime){
         validateCommonSchedulerDataParams(dummyTaskDataModels, jobData, callTime);
         // TODO Review this tolerance
         Assertions.assertTrue(callTime.toEpochMilli() - dummyTaskDataModels.getTask().getTriggerTime().toInstant().toEpochMilli() <= 50);
+        Assertions.assertEquals(dummyTaskDataModels.getTask().getTaskData(), jobDataMap.getWrappedMap());
     }
 
     private static void validateCommonSchedulerDataParams(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, Instant callTime) {
