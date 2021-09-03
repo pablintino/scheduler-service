@@ -11,5 +11,4 @@ public interface ISchedulingService {
     void deleteTask(String taskKey, String taskId);
     List<Task> getTasksForKey(String key);
     Task getTask(String key, String taskId);
-
 }

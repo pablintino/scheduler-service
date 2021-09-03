@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.util.HashMap;
 
 @Service
 public class CallbackService implements ICallbackService {
@@ -44,7 +45,8 @@ public class CallbackService implements ICallbackService {
         AmqpCallbackMessage message = new AmqpCallbackMessage(
                 schedulerJobData.getTaskId(),
                 schedulerJobData.getKey(),
-                jobDataMap.getWrappedMap(),
+                /* Convert to a serializable one (assumes values are serializable too) */
+                new HashMap<>(jobDataMap.getWrappedMap()),
                 scheduleEventMetadata.getTriggerTime().toEpochMilli(),
                 scheduleEventMetadata.getAttempt()
         );

@@ -16,6 +16,7 @@ import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.time.Instant;
+import java.util.HashMap;
 
 @ExtendWith(MockitoExtension.class)
 public class CallbackServiceTest {
@@ -43,7 +44,7 @@ public class CallbackServiceTest {
         callbackService.executeCallback(schedulerJobData, map, scheduleEventMetadata);
 
         /** Verify the expected enqueued data */
-        AmqpCallbackMessage expectedMessage = new AmqpCallbackMessage(DUMMY_ID_NAME, DUMMY_KEY_NAME, map.getWrappedMap(), scheduleEventMetadata.getTriggerTime().toEpochMilli(), scheduleEventMetadata.getAttempt());
+        AmqpCallbackMessage expectedMessage = new AmqpCallbackMessage(DUMMY_ID_NAME, DUMMY_KEY_NAME, new HashMap<>(map), scheduleEventMetadata.getTriggerTime().toEpochMilli(), scheduleEventMetadata.getAttempt());
         Mockito.verify(rabbitTemplate, Mockito.times(1)).convertAndSend(DUMMY_EXCHANGE_NAME, DUMMY_KEY_NAME, expectedMessage);
     }
 
