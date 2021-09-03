@@ -42,12 +42,12 @@ public class SchedulingDtoMapper implements ISchedulingDtoMapper {
 
     @Override
     public ScheduleTaskDto mapTasktoDto(Task task) {
-        return new ScheduleTaskDto(
-                task.getId(),
-                task.getKey(),
-                task.getTriggerTime(),
-                task.getCronExpression(),
-                task.getTaskData()
-        );
+        ScheduleTaskDto scheduleTaskDto = new ScheduleTaskDto();
+        scheduleTaskDto.setTaskKey(task.getKey());
+        scheduleTaskDto.setTaskIdentifier(task.getId());
+        scheduleTaskDto.setTriggerTime(task.getTriggerTime());
+        scheduleTaskDto.setCronExpression(task.getCronExpression());
+        scheduleTaskDto.setTaskData(task.getTaskData());
+        return scheduleTaskDto;
     }
 }
