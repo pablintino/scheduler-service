@@ -135,6 +135,7 @@
                                     <goal>timestamp-property</goal>
                                 </goals>
                                 <configuration>
+                                    <locale>en,US</locale>
                                     <name>timestamp-unique-id</name>
                                     <pattern>yyyyMMdd-HHmmssSSS</pattern>
                                 </configuration>

@@ -1,5 +1,6 @@
 package com.pablintino.schedulerservice.models;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.springframework.util.Assert;
@@ -10,10 +11,15 @@ import java.util.Map;
 
 @Getter
 @ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded=true)
 public class Task {
 
+    @EqualsAndHashCode.Include
     private final String id;
+
+    @EqualsAndHashCode.Include
     private final String key;
+
     private final ZonedDateTime triggerTime;
     private final String cronExpression;
 
