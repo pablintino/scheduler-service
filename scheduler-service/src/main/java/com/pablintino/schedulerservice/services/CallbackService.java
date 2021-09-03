@@ -46,7 +46,7 @@ public class CallbackService implements ICallbackService {
                 schedulerJobData.getTaskId(),
                 schedulerJobData.getKey(),
                 /* Convert to a serializable one (assumes values are serializable too) */
-                new HashMap<>(jobDataMap.getWrappedMap()),
+                jobDataMap.getWrappedMap(),
                 scheduleEventMetadata.getTriggerTime().toEpochMilli(),
                 scheduleEventMetadata.getAttempt()
         );
