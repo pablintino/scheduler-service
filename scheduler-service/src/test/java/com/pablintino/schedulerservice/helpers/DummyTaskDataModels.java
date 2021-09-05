@@ -1,5 +1,6 @@
 package com.pablintino.schedulerservice.helpers;
 
+import com.pablintino.schedulerservice.dtos.ScheduleRequestDto;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.Task;
 import lombok.Getter;
@@ -15,5 +16,6 @@ public class DummyTaskDataModels {
     private final Endpoint endpoint;
     private final Trigger trigger;
     private final JobDetail jobDetail;
+    private final ScheduleRequestDto scheduleRequestDto;
 
 }

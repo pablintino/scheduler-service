@@ -1,5 +1,8 @@
 package com.pablintino.schedulerservice.helpers;
 
+import com.pablintino.schedulerservice.dtos.CallbackDescriptorDto;
+import com.pablintino.schedulerservice.dtos.CallbackMethodTypeDto;
+import com.pablintino.schedulerservice.dtos.ScheduleRequestDto;
 import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
@@ -59,7 +62,18 @@ public class DummyTasksProvider {
                 .setJobData(dataMap)
                 .build();
 
-        return new DummyTaskDataModels(dummyTask, dummyEndpoint, trigger, job);
+        ScheduleRequestDto scheduleRequestDto = new ScheduleRequestDto();
+        scheduleRequestDto.setTaskData(dataMap.getWrappedMap());
+        scheduleRequestDto.setTaskKey(dummyTask.getKey());
+        scheduleRequestDto.setTaskIdentifier(dummyTask.getId());
+        scheduleRequestDto.setTriggerTime(dummyTask.getTriggerTime());
+        scheduleRequestDto.setCronExpression(dummyTask.getCronExpression());
+        CallbackDescriptorDto callbackDescriptorDto = new CallbackDescriptorDto();
+        callbackDescriptorDto.setEndpoint(dummyEndpoint.getCallbackUrl());
+        callbackDescriptorDto.setType(CallbackMethodTypeDto.valueOf(dummyEndpoint.getCallbackType().toString()));
+        scheduleRequestDto.setCallbackDescriptor(callbackDescriptorDto);
+
+        return new DummyTaskDataModels(dummyTask, dummyEndpoint, trigger, job,scheduleRequestDto);
     }
 
     public void validateSimpleValidReattemptedJob(DummyTaskDataModels dummyTaskDataModels, List<DummyCallbackService.CallbackCallEntry> executions, int retries, long attemptsDelay){
