@@ -16,7 +16,6 @@ import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.time.Instant;
-import java.util.HashMap;
 
 @ExtendWith(MockitoExtension.class)
 public class CallbackServiceTest {

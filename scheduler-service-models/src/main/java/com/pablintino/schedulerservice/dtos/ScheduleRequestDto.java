@@ -1,6 +1,5 @@
 package com.pablintino.schedulerservice.dtos;
 
-import lombok.Builder;
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 

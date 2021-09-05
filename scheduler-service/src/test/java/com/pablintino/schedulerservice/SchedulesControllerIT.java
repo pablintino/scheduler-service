@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.pablintino.schedulerservice.config.ExceptionControllerAdvice;
 import com.pablintino.schedulerservice.configurations.InMemoryQuartzConfiguration;
-import com.pablintino.schedulerservice.helpers.*;
-import com.pablintino.schedulerservice.models.Task;
+import com.pablintino.schedulerservice.helpers.DummyCallbackService;
+import com.pablintino.schedulerservice.helpers.DummyTaskDataModels;
+import com.pablintino.schedulerservice.helpers.DummyTasksProvider;
+import com.pablintino.schedulerservice.helpers.QuartzJobListener;
 import com.pablintino.schedulerservice.quartz.annotations.IReeschedulableAnnotationResolver;
 import com.pablintino.schedulerservice.quartz.annotations.ReeschedulableAnnotationResolver;
 import com.pablintino.schedulerservice.rest.SchedulesController;
@@ -20,29 +22,21 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.quartz.Scheduler;
-import org.quartz.SchedulerException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.servlet.ViewResolver;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -146,7 +140,6 @@ class SchedulesControllerIT {
         DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
         dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
     }
-
 
     @Test
     @DirtiesContext

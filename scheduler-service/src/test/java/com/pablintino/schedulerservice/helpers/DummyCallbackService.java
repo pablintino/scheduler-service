@@ -16,7 +16,7 @@ public class DummyCallbackService implements ICallbackService {
 
     @Getter
     @RequiredArgsConstructor
-    public class CallbackCallEntry {
+    public static class CallbackCallEntry {
         private final SchedulerJobData jobData;
         private final JobDataMap jobDataMap;
         private final ScheduleEventMetadata scheduleEventMetadata;

@@ -3,7 +3,6 @@ package com.pablintino.schedulerservice.services;
 import com.pablintino.schedulerservice.amqp.AmqpCallbackMessage;
 import com.pablintino.schedulerservice.exceptions.RemoteUnreachableException;
 import com.pablintino.schedulerservice.models.CallbackType;
-
 import com.pablintino.schedulerservice.models.ScheduleEventMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.ConnectException;
-import java.util.HashMap;
 
 @Service
 public class CallbackService implements ICallbackService {

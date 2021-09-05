@@ -18,7 +18,7 @@ public class QuartzJobListener implements JobListener {
 
     @Getter
     @RequiredArgsConstructor
-    public class JobExecutionEntry {
+    public static class JobExecutionEntry {
         private final JobExecutionContext jobExecutionContext;
         private final JobExecutionException ex;
     }
