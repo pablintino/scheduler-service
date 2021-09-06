@@ -96,7 +96,7 @@ public class DummyTasksProvider {
     public void validateSimpleValidJob(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, JobDataMap jobDataMap, Instant callTime){
         validateCommonSchedulerDataParams(dummyTaskDataModels, jobData, callTime);
         // TODO Review this tolerance
-        Assertions.assertTrue(callTime.toEpochMilli() - dummyTaskDataModels.getTask().getTriggerTime().toInstant().toEpochMilli() <= 50);
+        Assertions.assertTrue(callTime.toEpochMilli() - dummyTaskDataModels.getTask().getTriggerTime().toInstant().toEpochMilli() <= 500);
         Assertions.assertEquals(dummyTaskDataModels.getTask().getTaskData(), jobDataMap.getWrappedMap());
     }
 
