@@ -69,12 +69,19 @@ maven-deploy:
 
 docker-build:
   stage: package
-  variables:
-    CONTAINER_IMAGE: $CI_REGISTRY_IMAGE/scheduler-service:$CI_COMMIT_REF_SLUG
   script:
-    - docker build -t $CONTAINER_IMAGE ./scheduler-service
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLU ./scheduler-service
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $CONTAINER_IMAGE
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLU
   only:
     variables:
       - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+docker-build-tag:
+  stage: package
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME ./scheduler-service
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
+  only:
+    - tags
