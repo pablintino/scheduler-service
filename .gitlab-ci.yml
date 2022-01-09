@@ -44,7 +44,7 @@ maven-verify:
   extends: .it_tests_common_services_vars
   stage: build
   script:
-    - 'mvn $MAVEN_CLI_OPTS verify -P ci-it-test'
+    - 'mvn $MAVEN_CLI_OPTS verify -s ci_settings.xml -P ci-it-test'
   except:
     variables:
       - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
