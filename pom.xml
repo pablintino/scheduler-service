@@ -9,7 +9,7 @@
     </parent>
     <groupId>com.pablintino.services</groupId>
     <artifactId>scheduler-service-root</artifactId>
-    <version>0.0.2-SNAPSHOT</version>
+    <version>0.0.2</version>
     <name>scheduler-service-root</name>
     <description>Scheduler service for pablintino arq.</description>
     <packaging>pom</packaging>
@@ -49,6 +49,6 @@
     </distributionManagement>
     <scm>
         <developerConnection>scm:git:git@gitlab.pablintino.com:pablintino-arq/scheduler-service.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>scheduler-service-root-0.0.2</tag>
     </scm>
 </project>
