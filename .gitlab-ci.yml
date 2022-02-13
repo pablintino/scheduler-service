@@ -1,11 +1,10 @@
 image: docker:19.03.12
-# This template will build and test your projects
-# * Caches downloaded dependencies and plugins between invocation.
-# * Verify but don't deploy merge requests.
-# * Deploy built artifacts from master branch only.
+
 stages:
   - build
-  - package
+  - docker-build
+  - release
+  - docker-build-release
 
 variables:
   # This will suppress any download for dependencies and plugins or upload messages which would clutter the console log.
@@ -22,7 +21,16 @@ cache:
   paths:
     - .m2/repository
 
-.it_tests_common_services_vars:
+# Rules that applies to PIPELINE creation (not individual jobs)
+workflow:
+  rules:
+      # Avoid pipeline creation for maven release plugin commits
+    - if: $CI_COMMIT_MESSAGE =~ /^\[maven\-release\-plugin\]/
+      when: never
+    # Else (other): Run always
+    - when: always
+
+.mvn_build_and_it_tests:
   services:
     - name: postgres:13.4
       alias: it-postgres
@@ -37,51 +45,97 @@ cache:
     POSTGRES_DB: "it-database"
     POSTGRES_USER: "postgres"
     POSTGRES_PASSWORD: "changeme"
-
-# For merge requests do not `deploy` but only run `verify`.
-maven-verify:
-  image: maven:3.8.2-jdk-11
-  extends: .it_tests_common_services_vars
-  stage: build
-  script:
-    - 'mvn $MAVEN_CLI_OPTS verify -s ci_settings.xml -P ci-it-test'
-  except:
-    variables:
-      - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   artifacts:
     paths:
       - scheduler-service/target/*.jar
       - scheduler-service-models/target/*.jar
+    expire_in: 1 week
 
-# For `master` branch run `mvn deploy` automatically.
-maven-deploy:
+# For merge requests do not `deploy` but only run `verify`.
+maven-build-verify:
   image: maven:3.8.2-jdk-11
-  extends: .it_tests_common_services_vars
-  stage: package
+  extends: .mvn_build_and_it_tests
+  stage: build
+  script:
+    - 'mvn $MAVEN_CLI_OPTS verify -s ci_settings.xml -P ci-it-test'
+  except:
+    - master
+
+maven-build-deploy:
+  image: maven:3.8.2-jdk-11
+  extends: .mvn_build_and_it_tests
+  stage: build
   script:
     - if [ ! -f ci_settings.xml ];
         then echo "CI settings missing\! If deploying to GitLab Maven Repository, please see https://docs.gitlab.com/ee/user/packages/maven_repository/index.html#create-maven-packages-with-gitlab-cicd for instructions.";
       fi
     - 'mvn $MAVEN_CLI_OPTS deploy -s ci_settings.xml -P ci-it-test'
   only:
-    variables:
-      - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - master
 
 docker-build:
-  stage: package
+  stage: docker-build
+  variables:
+    # Do not clone. Not needed
+    GIT_STRATEGY: none
   script:
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG ./scheduler-service
+    - docker build -t $CI_REGISTRY_IMAGE:latest ./scheduler-service
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLU
+    - docker push $CI_REGISTRY_IMAGE:latest
   only:
-    variables:
-      - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - master
 
-docker-build-tag:
-  stage: package
+mvn-release:
+  image: maven:3.8.2-jdk-11
+  extends: .mvn_build_and_it_tests
+  stage: release
+  when: manual
+  allow_failure: false
+  before_script:
+    - 'mkdir -p ~/.ssh/'
+    - echo -n "$DEPLOY_PRIVATE_KEY" | base64 --decode > ~/.ssh/id_rsa
+    - chmod 700 ~/.ssh
+    - chmod 600 ~/.ssh/id_rsa
+    - 'cp $KNOWN_HOSTS ~/.ssh/known_hosts'
+    - 'apt-get update && apt-get install -y git'
+    - 'git config --global user.email "noreply@your.gitlab.host"'
+    - 'git config --global user.name "GitLab CI"'
+    - 'git checkout -B "$CI_COMMIT_REF_NAME"'
   script:
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME ./scheduler-service
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
+    - if [ ! -f ci_settings.xml ];
+      then echo "CI settings missing\! If deploying to GitLab Maven Repository, please see https://docs.gitlab.com/ee/user/packages/maven_repository/index.html#create-maven-packages-with-gitlab-cicd for instructions.";
+      fi
+
+    - if [ "$(cat scheduler-service/src/main/resources/application.properties | grep com.pablintino.scheduler.service.version | cut -d'=' -f2)" != "$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | cut -d '-' -f1)" ]; then
+      echo "Build failed cause com.pablintino.scheduler.service.version don't match the mvn version";
+      exit 1;
+      fi
+
+      # Grab jar name and version and add it to the dotenv file for further docker usage
+    - echo "BUILD_VERSION=v$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f scheduler-service/pom.xml | cut -d '-' -f1)" >> build.env
+    - echo "SPRING_BOOT_JAR_FILE=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout -f scheduler-service/pom.xml)-$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f scheduler-service/pom.xml | cut -d '-' -f1).jar" >> build.env
+    - 'mvn release:clean release:prepare release:perform -s ci_settings.xml -P ci-it-test'
+  variables:
+    # Ensure that the full repo is cloned on every execution. Fixes some issues about tags removed from remote but not in cache
+    GIT_STRATEGY: clone
+  artifacts:
+    reports:
+      dotenv: build.env 
+    paths:
+      - scheduler-service/target/*.jar
+      - scheduler-service-models/target/*.jar
+    expire_in: 1 week
   only:
-    - tags
+    - master
+
+docker-release-tag:
+  stage: docker-build-release
+  variables:
+    # Need to gather the whole repo to obtain the Dockerfile
+    GIT_STRATEGY: clone
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$BUILD_VERSION --build-arg JAR_FILE=./target/$SPRING_BOOT_JAR_FILE ./scheduler-service
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $CI_REGISTRY_IMAGE:$BUILD_VERSION
+  only:
+    - master
