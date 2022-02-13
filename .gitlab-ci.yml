@@ -5,7 +5,8 @@ image: docker:19.03.12
 # * Deploy built artifacts from master branch only.
 stages:
   - build
-  - package
+  - docker-build
+  - release
 
 variables:
   # This will suppress any download for dependencies and plugins or upload messages which would clutter the console log.
@@ -39,46 +40,77 @@ cache:
     POSTGRES_PASSWORD: "changeme"
 
 # For merge requests do not `deploy` but only run `verify`.
-maven-verify:
+maven-build-verify:
   image: maven:3.8.2-jdk-11
   extends: .it_tests_common_services_vars
   stage: build
   script:
     - 'mvn $MAVEN_CLI_OPTS verify -s ci_settings.xml -P ci-it-test'
   except:
-    variables:
-      - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - tags
+    - master
   artifacts:
     paths:
       - scheduler-service/target/*.jar
       - scheduler-service-models/target/*.jar
+    expire_in: 1 week
 
-# For `master` branch run `mvn deploy` automatically.
-maven-deploy:
+maven-build-deploy:
   image: maven:3.8.2-jdk-11
   extends: .it_tests_common_services_vars
-  stage: package
+  stage: build
   script:
     - if [ ! -f ci_settings.xml ];
         then echo "CI settings missing\! If deploying to GitLab Maven Repository, please see https://docs.gitlab.com/ee/user/packages/maven_repository/index.html#create-maven-packages-with-gitlab-cicd for instructions.";
       fi
     - 'mvn $MAVEN_CLI_OPTS deploy -s ci_settings.xml -P ci-it-test'
   only:
-    variables:
-      - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - tags
+    - master
+  artifacts:
+    paths:
+      - scheduler-service/target/*.jar
+      - scheduler-service-models/target/*.jar
+    expire_in: 1 week
+
+mvn-release:
+  image: maven:3.8.2-jdk-11
+  only:
+    - master
+  stage: release
+  when: manual
+  before_script:
+    - 'mkdir -p ~/.ssh/'
+    - 'cp $DEPLOY_PRIVATE_KEY ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa'
+    - 'cp $KNOWN_HOSTS ~/.ssh/known_hosts'
+    - 'apt-get update && apt-get install -y git'
+    - 'git config --global user.email "noreply@your.gitlab.host"'
+    - 'git config --global user.name "GitLab CI"'
+    - 'git checkout -B "$CI_COMMIT_REF_NAME"'
+  script:
+    - if [ ! -f ci_settings.xml ];
+      then echo "CI settings missing\! If deploying to GitLab Maven Repository, please see https://docs.gitlab.com/ee/user/packages/maven_repository/index.html#create-maven-packages-with-gitlab-cicd for instructions.";
+      fi
+    - PROJECT_VERSION=`mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | sed -n -e '/^\[.*\]/ !{ /^[0-9]/ { p; q } }'`
+    - 'mvn release:prepare release:perform -s ci_settings.xml -Dtag=v$PROJECT_VERSION'
 
 docker-build:
-  stage: package
+  stage: docker-build
+  variables:
+    # Do not clone. Not needed
+    GIT_STRATEGY: none
   script:
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG ./scheduler-service
+    - docker build -t $CI_REGISTRY_IMAGE:latest ./scheduler-service
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLU
+    - docker push $CI_REGISTRY_IMAGE:latest
   only:
-    variables:
-      - $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - master
 
-docker-build-tag:
-  stage: package
+docker-release-tag:
+  stage: docker-build
+  variables:
+    # Do not clone. Not needed
+    GIT_STRATEGY: none
   script:
     - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME ./scheduler-service
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
