@@ -105,12 +105,6 @@ mvn-release:
     - if [ ! -f ci_settings.xml ];
       then echo "CI settings missing\! If deploying to GitLab Maven Repository, please see https://docs.gitlab.com/ee/user/packages/maven_repository/index.html#create-maven-packages-with-gitlab-cicd for instructions.";
       fi
-
-    - if [ "$(cat scheduler-service/src/main/resources/application.properties | grep com.pablintino.scheduler.service.version | cut -d'=' -f2)" != "$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | cut -d '-' -f1)" ]; then
-      echo "Build failed cause com.pablintino.scheduler.service.version don't match the mvn version";
-      exit 1;
-      fi
-
       # Grab jar name and version and add it to the dotenv file for further docker usage
     - echo "BUILD_VERSION=v$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f scheduler-service/pom.xml | cut -d '-' -f1)" >> build.env
     - echo "SPRING_BOOT_JAR_FILE=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout -f scheduler-service/pom.xml)-$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f scheduler-service/pom.xml | cut -d '-' -f1).jar" >> build.env

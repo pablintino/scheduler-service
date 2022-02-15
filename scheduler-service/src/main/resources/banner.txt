@@ -8,4 +8,4 @@
  |  |        |  | |  |  | '--'  /  |      |  (_|  |    |  | \   |      |  |    (_|  |    |  | \   |      `'  '-'  '
  `--'        `--' `--'  `------'   `------'    `--'    `--'  `--'      `--'      `--'    `--'  `--'        `-----'
 
-${AnsiColor.GREEN}Scheduler Service (${com.pablintino.scheduler.service.version}) :: Spring Boot${spring-boot.formatted-version} ${Ansi.DEFAULT}
+${AnsiColor.GREEN}Scheduler Service (${com.pablintino.scheduler.service.version}) #${com.pablintino.scheduler.service.source-id}${Ansi.DEFAULT}
