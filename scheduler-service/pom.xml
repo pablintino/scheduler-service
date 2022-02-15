@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.pablintino.services</groupId>
@@ -91,10 +92,34 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>buildnumber-maven-plugin</artifactId>
+                <version>1.4</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>create</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <doCheck>false</doCheck>
+                    <doUpdate>false</doUpdate>
+                    <shortRevisionLength>20</shortRevisionLength>
+                </configuration>
             </plugin>
         </plugins>
     </build>
@@ -193,7 +218,8 @@
                                     <name>postgres:13.4</name>
                                     <alias>database</alias>
                                     <run>
-                                        <containerNamePattern>scheduler_it_test_%a_${timestamp-unique-id}</containerNamePattern>
+                                        <containerNamePattern>scheduler_it_test_%a_${timestamp-unique-id}
+                                        </containerNamePattern>
                                         <ports>
                                             <port>${postgres.port}:5432</port>
                                         </ports>
@@ -212,7 +238,8 @@
                                     <name>rabbitmq:3-management</name>
                                     <alias>rabbitmq</alias>
                                     <run>
-                                        <containerNamePattern>scheduler_it_test_%a_${timestamp-unique-id}</containerNamePattern>
+                                        <containerNamePattern>scheduler_it_test_%a_${timestamp-unique-id}
+                                        </containerNamePattern>
                                         <ports>
                                             <port>${rabbitmq.broker.port}:5672</port>
                                         </ports>
