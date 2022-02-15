@@ -14,6 +14,7 @@ import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.stereotype.Service;
 
+import java.text.ParseException;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -116,9 +117,19 @@ public class SchedulingService implements ISchedulingService {
                 .withIdentity(triggerName, task.getKey())
                 .startAt(Date.from(task.getTriggerTime().toInstant()));
 
-        if (StringUtils.isEmpty(task.getCronExpression())) {
-            return builder.withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
+        return StringUtils.isNotBlank(task.getCronExpression()) ?
+                prepareCronTrigger(builder, task) :
+                builder.withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
+
+    }
+
+    private Trigger prepareCronTrigger(TriggerBuilder<Trigger> builder, Task task) {
+        try {
+            new CronExpression(task.getCronExpression());
+        } catch (ParseException ex) {
+            throw new SchedulerValidationException("The given cron expression is invalid " + task.getCronExpression(), ex);
         }
+
         return builder.withSchedule(CronScheduleBuilder.cronSchedule(task.getCronExpression())).build();
     }
 
