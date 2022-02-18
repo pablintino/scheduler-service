@@ -19,17 +19,18 @@ import java.util.Map;
 @Import(AmqpCommonConfiguration.class)
 public class AmqpConfiguration {
 
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
+  @Autowired private RabbitTemplate rabbitTemplate;
 
-    @Bean
-    DirectExchange exchange(@Value("${com.pablintino.scheduler.amqp.exchange-name}") String exchangeName) {
-        return new DirectExchange(exchangeName);
-    }
+  @Bean
+  DirectExchange exchange(
+      @Value("${com.pablintino.scheduler.amqp.exchange-name}") String exchangeName) {
+    return new DirectExchange(exchangeName);
+  }
 
-    @EventListener({ContextRefreshedEvent.class})
-    void contextRefreshedEvent() {
-        Map<String, Object> serverProperties = rabbitTemplate.execute((channel) -> channel.getConnection().getServerProperties());
-        log.debug("Auto boot RabbitMQ call performed. Server details {}", serverProperties);
-    }
+  @EventListener({ContextRefreshedEvent.class})
+  void contextRefreshedEvent() {
+    Map<String, Object> serverProperties =
+        rabbitTemplate.execute((channel) -> channel.getConnection().getServerProperties());
+    log.debug("Auto boot RabbitMQ call performed. Server details {}", serverProperties);
+  }
 }

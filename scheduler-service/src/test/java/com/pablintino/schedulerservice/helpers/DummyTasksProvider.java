@@ -14,97 +14,134 @@ import org.junit.jupiter.api.Assertions;
 import org.quartz.*;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
-
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
 public class DummyTasksProvider {
 
-    private final IJobParamsEncoder jobParamsEncoder;
+  private final IJobParamsEncoder jobParamsEncoder;
 
+  public Map<String, Object> createSimpleJobDataMap() {
+    Map<String, Object> dummyMap = new HashMap<>();
+    dummyMap.put("key1-int", 1);
+    dummyMap.put("key1-double", 1.2);
+    dummyMap.put("key1-str", "test");
+    dummyMap.put("key1-bool", true);
+    return dummyMap;
+  }
 
-    public Map<String, Object> createSimpleJobDataMap(){
-        Map<String, Object> dummyMap = new HashMap<>();
-        dummyMap.put("key1-int", 1);
-        dummyMap.put("key1-double", 1.2);
-        dummyMap.put("key1-str", "test");
-        dummyMap.put("key1-bool", true);
-        return dummyMap;
-    }
+  public DummyTaskDataModels createSimpleValidJob(String name, long triggerTime) {
+    Date startDate = Date.from(Instant.now().plusMillis(triggerTime));
+    Trigger trigger =
+        TriggerBuilder.newTrigger()
+            .withIdentity(name, "it-test")
+            .startAt(startDate)
+            .withSchedule(SimpleScheduleBuilder.simpleSchedule())
+            .build();
 
-    public DummyTaskDataModels createSimpleValidJob(String name, long triggerTime) {
-        Date startDate = Date.from(Instant.now().plusMillis(triggerTime));
-        Trigger trigger = TriggerBuilder
-                .newTrigger()
-                .withIdentity(name, "it-test")
-                .startAt(startDate)
-                .withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
+    Task dummyTask =
+        new Task(
+            name,
+            "it-test",
+            ZonedDateTime.ofInstant(startDate.toInstant(), ZoneOffset.UTC),
+            null,
+            createSimpleJobDataMap());
 
-        Task dummyTask = new Task(name, "it-test",
-                ZonedDateTime.ofInstant(startDate.toInstant(), ZoneOffset.UTC),
-                null,
-                createSimpleJobDataMap());
+    Endpoint dummyEndpoint = new Endpoint(CallbackType.AMQP, null);
 
-        Endpoint dummyEndpoint = new Endpoint(CallbackType.AMQP, null);
+    JobDataMap dataMap =
+        new JobDataMap(jobParamsEncoder.createEncodeJobParameters(dummyTask, dummyEndpoint));
+    JobDetail job =
+        JobBuilder.newJob(CallbackJob.class)
+            .withIdentity(dummyTask.getId(), dummyTask.getKey())
+            .setJobData(dataMap)
+            .build();
 
-        JobDataMap dataMap = new JobDataMap();
-        dataMap.putAll(jobParamsEncoder.encodeJobParameters(dummyTask, dummyEndpoint));
-        dataMap.putAll(dummyTask.getTaskData());
+    ScheduleRequestDto scheduleRequestDto = new ScheduleRequestDto();
+    scheduleRequestDto.setTaskData(dummyTask.getTaskData());
+    scheduleRequestDto.setTaskKey(dummyTask.getKey());
+    scheduleRequestDto.setTaskIdentifier(dummyTask.getId());
+    scheduleRequestDto.setTriggerTime(dummyTask.getTriggerTime());
+    scheduleRequestDto.setCronExpression(dummyTask.getCronExpression());
+    CallbackDescriptorDto callbackDescriptorDto = new CallbackDescriptorDto();
+    callbackDescriptorDto.setEndpoint(dummyEndpoint.getCallbackUrl());
+    callbackDescriptorDto.setType(
+        CallbackMethodTypeDto.valueOf(dummyEndpoint.getCallbackType().toString()));
+    scheduleRequestDto.setCallbackDescriptor(callbackDescriptorDto);
 
-        JobDetail job = JobBuilder
-                .newJob(CallbackJob.class)
-                .withIdentity(dummyTask.getId(), dummyTask.getKey())
-                .setJobData(dataMap)
-                .build();
+    return new DummyTaskDataModels(dummyTask, dummyEndpoint, trigger, job, scheduleRequestDto);
+  }
 
-        ScheduleRequestDto scheduleRequestDto = new ScheduleRequestDto();
-        scheduleRequestDto.setTaskData(dataMap.getWrappedMap());
-        scheduleRequestDto.setTaskKey(dummyTask.getKey());
-        scheduleRequestDto.setTaskIdentifier(dummyTask.getId());
-        scheduleRequestDto.setTriggerTime(dummyTask.getTriggerTime());
-        scheduleRequestDto.setCronExpression(dummyTask.getCronExpression());
-        CallbackDescriptorDto callbackDescriptorDto = new CallbackDescriptorDto();
-        callbackDescriptorDto.setEndpoint(dummyEndpoint.getCallbackUrl());
-        callbackDescriptorDto.setType(CallbackMethodTypeDto.valueOf(dummyEndpoint.getCallbackType().toString()));
-        scheduleRequestDto.setCallbackDescriptor(callbackDescriptorDto);
+  public void validateSimpleValidReattemptedNotRecoveredJob(
+      DummyTaskDataModels dummyTaskDataModels,
+      List<DummyCallbackService.CallbackCallEntry> executions,
+      int retries,
+      long attemptsDelay) {
+    Assertions.assertEquals(retries + 1, executions.size());
+    for (int index = 0; index < executions.size(); index++) {
+      DummyCallbackService.CallbackCallEntry currentEntry = executions.get(index);
+      validateCommonSchedulerDataParams(
+          dummyTaskDataModels,
+          currentEntry.getJobData(),
+          currentEntry.getJobData().getMetadata().getLastTriggerTime());
+      // TODO Improve this checks. Too basic
+      Assertions.assertEquals(
+          index + 1, currentEntry.getJobData().getMetadata().getNotificationAttempt());
+      Assertions.assertEquals(index + 1, currentEntry.getJobData().getMetadata().getExecutions());
+      Assertions.assertEquals(index + 1, currentEntry.getJobData().getMetadata().getFailures());
+      Assertions.assertEquals(
+          dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskDataMap());
+      Assertions.assertNotNull(currentEntry.getJobData().getMetadata().getLastFailureTime());
 
-        return new DummyTaskDataModels(dummyTask, dummyEndpoint, trigger, job,scheduleRequestDto);
-    }
-
-    public void validateSimpleValidReattemptedJob(DummyTaskDataModels dummyTaskDataModels, List<DummyCallbackService.CallbackCallEntry> executions, int retries, long attemptsDelay){
-        Assertions.assertEquals(retries + 1, executions.size());
-        for(int index = 0; index < executions.size(); index++){
-            DummyCallbackService.CallbackCallEntry currentEntry = executions.get(index);
-            validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.getJobData(), currentEntry.getScheduleEventMetadata().getTriggerTime());
-            Assertions.assertEquals(index + 1, currentEntry.getScheduleEventMetadata().getAttempt());
-            if(index > 0){
-                DummyCallbackService.CallbackCallEntry previousEntry = executions.get(index - 1);
-                Instant expectedRetriggerTime = previousEntry.getScheduleEventMetadata().getTriggerTime().plus(attemptsDelay, ChronoUnit.MILLIS);
-                Instant retriggerInstant = currentEntry.getScheduleEventMetadata().getTriggerTime();
-                if(expectedRetriggerTime.plus(50, ChronoUnit.MILLIS).isBefore(retriggerInstant) || expectedRetriggerTime.minus(50, ChronoUnit.MILLIS).isAfter(retriggerInstant)){
-                    Assertions.fail("Retrigger instant of a reattempt is out of time");
-                }
-            }
+      if (index > 0) {
+        DummyCallbackService.CallbackCallEntry previousEntry = executions.get(index - 1);
+        Instant expectedRetriggerTime =
+            previousEntry
+                .getJobData()
+                .getMetadata()
+                .getLastTriggerTime()
+                .plus(attemptsDelay, ChronoUnit.MILLIS);
+        Instant retriggerInstant = currentEntry.getJobData().getMetadata().getLastTriggerTime();
+        if (expectedRetriggerTime.plus(50, ChronoUnit.MILLIS).isBefore(retriggerInstant)
+            || expectedRetriggerTime.minus(50, ChronoUnit.MILLIS).isAfter(retriggerInstant)) {
+          Assertions.fail("Retrigger instant of a reattempt is out of time");
         }
+      }
     }
+  }
 
-    public void validateSimpleValidJob(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, JobDataMap jobDataMap, Instant callTime){
-        validateCommonSchedulerDataParams(dummyTaskDataModels, jobData, callTime);
-        // TODO Review this tolerance
-        Assertions.assertTrue(callTime.toEpochMilli() - dummyTaskDataModels.getTask().getTriggerTime().toInstant().toEpochMilli() <= 500);
-        Assertions.assertEquals(dummyTaskDataModels.getTask().getTaskData(), jobDataMap.getWrappedMap());
-    }
+  public void validateSimpleValidJob(
+      DummyTaskDataModels dummyTaskDataModels,
+      SchedulerJobData jobData,
+      Map<String, Object> taskDataMap,
+      Instant callTime) {
+    validateCommonSchedulerDataParams(dummyTaskDataModels, jobData, callTime);
+    // TODO Review this tolerance
+    Assertions.assertTrue(
+        callTime.toEpochMilli()
+                - dummyTaskDataModels.getTask().getTriggerTime().toInstant().toEpochMilli()
+            <= 500);
+    Assertions.assertEquals(dummyTaskDataModels.getTask().getTaskData(), taskDataMap);
+  }
 
-    private static void validateCommonSchedulerDataParams(DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, Instant callTime) {
-        Assertions.assertEquals(dummyTaskDataModels.getTask().getId(), jobData.getTaskId());
-        Assertions.assertEquals(dummyTaskDataModels.getTask().getKey(), jobData.getKey());
-        Assertions.assertEquals(dummyTaskDataModels.getEndpoint().getCallbackUrl(), jobData.getCallbackUrl());
-        Assertions.assertEquals(dummyTaskDataModels.getEndpoint().getCallbackType(), jobData.getType());
-        Assertions.assertTrue(dummyTaskDataModels.getTask().getTriggerTime().toInstant().isBefore(callTime));
-    }
+  private static void validateCommonSchedulerDataParams(
+      DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData, Instant callTime) {
+    Assertions.assertEquals(dummyTaskDataModels.getTask().getId(), jobData.getTaskId());
+    Assertions.assertEquals(dummyTaskDataModels.getTask().getKey(), jobData.getKey());
+    Assertions.assertEquals(
+        dummyTaskDataModels.getEndpoint().getCallbackUrl(), jobData.getCallbackUrl());
+    Assertions.assertEquals(dummyTaskDataModels.getEndpoint().getCallbackType(), jobData.getType());
+    Assertions.assertFalse(
+        Duration.between(dummyTaskDataModels.getTask().getTriggerTime().toInstant(), callTime)
+            .isNegative());
+  }
 }

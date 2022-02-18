@@ -1,5 +1,7 @@
 package com.pablintino.schedulerservice;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.pablintino.schedulerservice.configurations.InMemoryQuartzConfiguration;
 import com.pablintino.schedulerservice.helpers.DummyCallbackService;
 import com.pablintino.schedulerservice.helpers.DummyTaskDataModels;
@@ -21,145 +23,183 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.test.annotation.DirtiesContext;
 
 import java.util.List;
 import java.util.UUID;
 
-
 @SpringBootTest()
 class SchedulerServiceIT {
 
-    @Autowired
-    private DummyCallbackService dummyCallbackService;
+  @Autowired private DummyCallbackService dummyCallbackService;
 
-    @Autowired
-    private Scheduler scheduler;
+  @Autowired private Scheduler scheduler;
 
-    @Autowired
-    private ISchedulingService schedulingService;
+  @Autowired private ISchedulingService schedulingService;
 
-    @Autowired
-    private DummyTasksProvider dummyTasksProvider;
+  @Autowired private DummyTasksProvider dummyTasksProvider;
 
-    @Configuration
-    @Import(InMemoryQuartzConfiguration.class)
-    static class TestConfiguration {
+  @Configuration
+  @Import(InMemoryQuartzConfiguration.class)
+  static class TestConfiguration {
 
-        @Bean
-        public DummyTasksProvider dummyTasksProvider(JobParamsEncoder jobParamsEncoder){
-            return new DummyTasksProvider(jobParamsEncoder);
-        }
-
-        @Bean
-        public DummyCallbackService callbackService() {
-            return new DummyCallbackService();
-        }
-
-        @Bean
-        public JobParamsEncoder jobParamsEncoder() {
-            return new JobParamsEncoder();
-        }
-
-        @Bean
-        public IReeschedulableAnnotationResolver reeschedulableAnnotationResolver() {
-            return new ReeschedulableAnnotationResolver();
-        }
-
-        @Bean
-        public ISchedulingService schedulingService(Scheduler scheduler, IJobParamsEncoder jobParamsEncoder) {
-            return new SchedulingService(scheduler, jobParamsEncoder);
-        }
+    @Bean
+    public DummyTasksProvider dummyTasksProvider(JobParamsEncoder jobParamsEncoder) {
+      return new DummyTasksProvider(jobParamsEncoder);
     }
 
-    @Test
-    @DirtiesContext
-    void simpleScheduleTaskOK() throws SchedulerException {
-        QuartzJobListener listener = new QuartzJobListener();
-        scheduler.getListenerManager().addJobListener(listener);
-
-        DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
-
-        QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(1500);
-        Assertions.assertNotNull(jobExecution);
-        Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
-        DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
+    @Bean
+    public DummyCallbackService callbackService() {
+      return new DummyCallbackService();
     }
 
-    @Test
-    @DirtiesContext
-    void getTasksOK() throws SchedulerException {
-
-        QuartzJobListener listener = new QuartzJobListener();
-        scheduler.getListenerManager().addJobListener(listener);
-
-        DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 2000);
-        schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
-
-        DummyTaskDataModels testModels2 = dummyTasksProvider.createSimpleValidJob("test-job2", 1000);
-        schedulingService.scheduleTask(testModels2.getTask(), testModels2.getEndpoint());
-
-        List<Task> tasks = schedulingService.getTasksForKey(testModels.getTask().getKey());
-        Assertions.assertEquals(2, tasks.size());
-        Assertions.assertEquals(testModels.getTask(), tasks.stream().filter(t -> testModels.getTask().getId().equals(t.getId())).findFirst().orElse(null));
-        Assertions.assertEquals(testModels2.getTask(), tasks.stream().filter(t -> testModels2.getTask().getId().equals(t.getId())).findFirst().orElse(null));
-        List<QuartzJobListener.JobExecutionEntry> jobExecutions= listener.waitJobExecutions(2, 3000);
-        Assertions.assertEquals(2, jobExecutions.size());
-
-        DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        if(testModels.getTask().getId().equals(callbackCallEntry.getJobData().getTaskId())){
-            dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
-        }else if(testModels2.getTask().getId().equals(callbackCallEntry.getJobData().getTaskId())){
-            dummyTasksProvider.validateSimpleValidJob(testModels2, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
-        }else {
-            Assertions.fail("Unexpected task");
-        }
+    @Bean
+    public ObjectMapper objectMapper() {
+      return Jackson2ObjectMapperBuilder.json().modules(new JavaTimeModule()).build();
     }
 
-    @Test
-    @DirtiesContext
-    void deleteTaskOK() throws SchedulerException {
-
-        QuartzJobListener listener = new QuartzJobListener();
-        scheduler.getListenerManager().addJobListener(listener);
-
-        DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
-
-        List<Task> tasks = schedulingService.getTasksForKey(testModels.getTask().getKey());
-        Assertions.assertEquals(1, tasks.size());
-        Assertions.assertEquals(testModels.getTask(), tasks.stream().filter(t -> testModels.getTask().getId().equals(t.getId())).findFirst().orElse(null));
-
-        schedulingService.deleteTask(testModels.getTask().getKey(), testModels.getTask().getId());
-
-        List<QuartzJobListener.JobExecutionEntry> jobExecutions= listener.waitJobExecutions(1, 3000);
-        Assertions.assertEquals(0, jobExecutions.size());
+    @Bean
+    public JobParamsEncoder jobParamsEncoder(ObjectMapper objectMapper) {
+      return new JobParamsEncoder(objectMapper);
     }
 
-    @Test
-    @DirtiesContext
-    void getTaskOK() throws SchedulerException {
-
-        QuartzJobListener listener = new QuartzJobListener();
-        scheduler.getListenerManager().addJobListener(listener);
-
-        DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
-
-        Task task = schedulingService.getTask(testModels.getTask().getKey(), testModels.getTask().getId());
-        Assertions.assertNotNull(task);
-        Assertions.assertEquals(testModels.getTask(), task);
-
-        Assertions.assertNull(schedulingService.getTask(UUID.randomUUID().toString(), testModels.getTask().getId()));
-
-        List<QuartzJobListener.JobExecutionEntry> jobExecutions= listener.waitJobExecutions(2, 2000);
-        Assertions.assertEquals(1, jobExecutions.size());
-
-        Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
-        DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
+    @Bean
+    public IReeschedulableAnnotationResolver reeschedulableAnnotationResolver() {
+      return new ReeschedulableAnnotationResolver();
     }
+
+    @Bean
+    public ISchedulingService schedulingService(
+        Scheduler scheduler, IJobParamsEncoder jobParamsEncoder) {
+      return new SchedulingService(scheduler, jobParamsEncoder);
+    }
+  }
+
+  @Test
+  @DirtiesContext
+  void simpleScheduleTaskOK() throws SchedulerException {
+    QuartzJobListener listener = new QuartzJobListener();
+    scheduler.getListenerManager().addJobListener(listener);
+
+    DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
+    schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
+
+    QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(1500);
+    Assertions.assertNotNull(jobExecution);
+    Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
+    DummyCallbackService.CallbackCallEntry callbackCallEntry =
+        dummyCallbackService.getExecutions().peek();
+    dummyTasksProvider.validateSimpleValidJob(
+        testModels,
+        callbackCallEntry.getJobData(),
+        callbackCallEntry.getTaskDataMap(),
+        callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+  }
+
+  @Test
+  @DirtiesContext
+  void getTasksOK() throws SchedulerException {
+
+    QuartzJobListener listener = new QuartzJobListener();
+    scheduler.getListenerManager().addJobListener(listener);
+
+    DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 2000);
+    schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
+
+    DummyTaskDataModels testModels2 = dummyTasksProvider.createSimpleValidJob("test-job2", 1000);
+    schedulingService.scheduleTask(testModels2.getTask(), testModels2.getEndpoint());
+
+    List<Task> tasks = schedulingService.getTasksForKey(testModels.getTask().getKey());
+    Assertions.assertEquals(2, tasks.size());
+    Assertions.assertEquals(
+        testModels.getTask(),
+        tasks.stream()
+            .filter(t -> testModels.getTask().getId().equals(t.getId()))
+            .findFirst()
+            .orElse(null));
+    Assertions.assertEquals(
+        testModels2.getTask(),
+        tasks.stream()
+            .filter(t -> testModels2.getTask().getId().equals(t.getId()))
+            .findFirst()
+            .orElse(null));
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 3000);
+    Assertions.assertEquals(2, jobExecutions.size());
+
+    DummyCallbackService.CallbackCallEntry callbackCallEntry =
+        dummyCallbackService.getExecutions().peek();
+    if (testModels.getTask().getId().equals(callbackCallEntry.getJobData().getTaskId())) {
+      dummyTasksProvider.validateSimpleValidJob(
+          testModels,
+          callbackCallEntry.getJobData(),
+          callbackCallEntry.getTaskDataMap(),
+          callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+    } else if (testModels2.getTask().getId().equals(callbackCallEntry.getJobData().getTaskId())) {
+      dummyTasksProvider.validateSimpleValidJob(
+          testModels2,
+          callbackCallEntry.getJobData(),
+          callbackCallEntry.getTaskDataMap(),
+          callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+    } else {
+      Assertions.fail("Unexpected task");
+    }
+  }
+
+  @Test
+  @DirtiesContext
+  void deleteTaskOK() throws SchedulerException {
+
+    QuartzJobListener listener = new QuartzJobListener();
+    scheduler.getListenerManager().addJobListener(listener);
+
+    DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
+    schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
+
+    List<Task> tasks = schedulingService.getTasksForKey(testModels.getTask().getKey());
+    Assertions.assertEquals(1, tasks.size());
+    Assertions.assertEquals(
+        testModels.getTask(),
+        tasks.stream()
+            .filter(t -> testModels.getTask().getId().equals(t.getId()))
+            .findFirst()
+            .orElse(null));
+
+    schedulingService.deleteTask(testModels.getTask().getKey(), testModels.getTask().getId());
+
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(1, 3000);
+    Assertions.assertEquals(0, jobExecutions.size());
+  }
+
+  @Test
+  @DirtiesContext
+  void getTaskOK() throws SchedulerException {
+
+    QuartzJobListener listener = new QuartzJobListener();
+    scheduler.getListenerManager().addJobListener(listener);
+
+    DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
+    schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
+
+    Task task =
+        schedulingService.getTask(testModels.getTask().getKey(), testModels.getTask().getId());
+    Assertions.assertNotNull(task);
+    Assertions.assertEquals(testModels.getTask(), task);
+
+    Assertions.assertNull(
+        schedulingService.getTask(UUID.randomUUID().toString(), testModels.getTask().getId()));
+
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 2000);
+    Assertions.assertEquals(1, jobExecutions.size());
+
+    Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
+    DummyCallbackService.CallbackCallEntry callbackCallEntry =
+        dummyCallbackService.getExecutions().peek();
+
+    dummyTasksProvider.validateSimpleValidJob(
+        testModels,
+        callbackCallEntry.getJobData(),
+        callbackCallEntry.getTaskDataMap(),
+        callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+  }
 }
