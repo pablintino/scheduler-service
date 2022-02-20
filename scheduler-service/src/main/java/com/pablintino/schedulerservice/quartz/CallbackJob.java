@@ -162,14 +162,6 @@ public class CallbackJob implements Job {
     throw new JobExecutionException(false);
   }
 
-  private static String getRetryTriggerName(String currentName, long attempt) {
-    int p = currentName.lastIndexOf("_retry");
-    if (p >= 0) {
-      return currentName.substring(0, p) + "_retry_" + attempt;
-    }
-    return currentName + "_retry_" + attempt;
-  }
-
   private Trigger rebuildTrigger(JobExecutionContext jobExecutionContext, long attemptNumber) {
     ScheduleBuilder scheduleBuilder =
         jobExecutionContext.getTrigger() instanceof CronTrigger
@@ -178,9 +170,7 @@ public class CallbackJob implements Job {
             : SimpleScheduleBuilder.simpleSchedule();
 
     return TriggerBuilder.newTrigger()
-        .withIdentity(
-            getRetryTriggerName(jobExecutionContext.getTrigger().getKey().getName(), attemptNumber),
-            jobExecutionContext.getTrigger().getKey().getGroup())
+        .withIdentity(jobExecutionContext.getTrigger().getKey())
         .startAt(Date.from(Instant.now().plusMillis(retrialDelay)))
         .withSchedule(scheduleBuilder)
         .build();

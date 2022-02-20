@@ -165,4 +165,43 @@ class CallbackJobIT {
     Assertions.assertFalse(jobExecutions.stream().anyMatch(ex -> ex.getEx().refireImmediately()));
     Assertions.assertNull(scheduler.getTrigger(testModels.getTrigger().getKey()));
   }
+
+  @Test
+  @DirtiesContext
+  void cronScheduledExecutionRecoveredFailureOK() throws SchedulerException {
+    QuartzJobListener listener = new QuartzJobListener();
+    scheduler.getListenerManager().addJobListener(listener);
+    dummyCallbackService.setCallback(
+        (s, j) -> {
+          if (s.getMetadata().getExecutions() < 2) {
+            throw new RuntimeException("test exception");
+          }
+        });
+
+    Mockito.when(reeschedulableAnnotationResolver.getAnnotatedTypes())
+        .thenReturn(Collections.singleton(RuntimeException.class));
+
+    DummyTaskDataModels testModels =
+        dummyTasksProvider.createCronValidJob("test-job1", 1000, " 0/2 * * * * ? *");
+    scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
+
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        listener.waitJobExecutions(
+            3, Math.round(Math.ceil((failureAttempts + 1) * failureAttemptDelay * 1.1)));
+
+    /* Ensure trigger has not being deleted */
+    Assertions.assertNotNull(scheduler.getTrigger(testModels.getTrigger().getKey()));
+
+    /* Delete trigger to prevent jobs to being launched while checking results*/
+    scheduler.unscheduleJob(testModels.getTrigger().getKey());
+    Assertions.assertEquals(3, jobExecutions.size());
+    Assertions.assertEquals(3, dummyCallbackService.getExecutions().size());
+
+    dummyTasksProvider.validateReattemptedAndRecoveredJob(
+        testModels,
+        dummyCallbackService.getExecutions().stream().collect(Collectors.toList()),
+        failureAttempts,
+        failureAttemptDelay,
+        3);
+  }
 }

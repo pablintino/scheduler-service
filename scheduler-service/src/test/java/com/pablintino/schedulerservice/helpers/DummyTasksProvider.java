@@ -10,6 +10,7 @@ import com.pablintino.schedulerservice.models.Task;
 import com.pablintino.schedulerservice.quartz.CallbackJob;
 import com.pablintino.schedulerservice.services.IJobParamsEncoder;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Assertions;
 import org.quartz.*;
 import org.springframework.stereotype.Component;
@@ -40,20 +41,36 @@ public class DummyTasksProvider {
   }
 
   public DummyTaskDataModels createSimpleValidJob(String name, long triggerTime) {
+
+    return getDummyTaskDataModels(name, triggerTime, null);
+  }
+
+  public DummyTaskDataModels createCronValidJob(String name, long triggerTime, String cron) {
+
+    return getDummyTaskDataModels(name, triggerTime, cron);
+  }
+
+  private DummyTaskDataModels getDummyTaskDataModels(String name, long triggerTime, String cron) {
     Date startDate = Date.from(Instant.now().plusMillis(triggerTime));
+    Assertions.assertTrue(cron == null || (cron != null && StringUtils.isNotBlank(cron)));
+    Assertions.assertTrue(StringUtils.isNotBlank(name));
+
+    ScheduleBuilder triggerBuilder =
+        StringUtils.isBlank(cron)
+            ? SimpleScheduleBuilder.simpleSchedule()
+            : CronScheduleBuilder.cronSchedule(cron);
     Trigger trigger =
         TriggerBuilder.newTrigger()
             .withIdentity(name, "it-test")
             .startAt(startDate)
-            .withSchedule(SimpleScheduleBuilder.simpleSchedule())
+            .withSchedule(triggerBuilder)
             .build();
-
     Task dummyTask =
         new Task(
             name,
             "it-test",
             ZonedDateTime.ofInstant(startDate.toInstant(), ZoneOffset.UTC),
-            null,
+            cron,
             createSimpleJobDataMap());
 
     Endpoint dummyEndpoint = new Endpoint(CallbackType.AMQP, null);
@@ -104,18 +121,55 @@ public class DummyTasksProvider {
 
       if (index > 0) {
         DummyCallbackService.CallbackCallEntry previousEntry = executions.get(index - 1);
-        Instant expectedRetriggerTime =
-            previousEntry
-                .getJobData()
-                .getMetadata()
-                .getLastTriggerTime()
-                .plus(attemptsDelay, ChronoUnit.MILLIS);
-        Instant retriggerInstant = currentEntry.getJobData().getMetadata().getLastTriggerTime();
-        if (expectedRetriggerTime.plus(50, ChronoUnit.MILLIS).isBefore(retriggerInstant)
-            || expectedRetriggerTime.minus(50, ChronoUnit.MILLIS).isAfter(retriggerInstant)) {
-          Assertions.fail("Retrigger instant of a reattempt is out of time");
-        }
+        validateRetriesTime(currentEntry, previousEntry, attemptsDelay);
       }
+    }
+  }
+
+  public void validateReattemptedAndRecoveredJob(
+      DummyTaskDataModels dummyTaskDataModels,
+      List<DummyCallbackService.CallbackCallEntry> executions,
+      int retries,
+      long attemptsDelay,
+      int recoverRetry) {
+    Assertions.assertEquals(retries + 1, executions.size());
+    for (int index = 0; index < executions.size(); index++) {
+      DummyCallbackService.CallbackCallEntry currentEntry = executions.get(index);
+      validateCommonSchedulerDataParams(
+          dummyTaskDataModels,
+          currentEntry.getJobData(),
+          currentEntry.getJobData().getMetadata().getLastTriggerTime());
+      // TODO Improve this checks. Too basic
+      Assertions.assertEquals(
+          index + 1, currentEntry.getJobData().getMetadata().getNotificationAttempt());
+      Assertions.assertEquals(index + 1, currentEntry.getJobData().getMetadata().getExecutions());
+      Assertions.assertEquals(index + 1, currentEntry.getJobData().getMetadata().getFailures());
+      Assertions.assertEquals(
+          dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskDataMap());
+      Assertions.assertNotNull(currentEntry.getJobData().getMetadata().getLastFailureTime());
+
+      if (index > 0) {
+        DummyCallbackService.CallbackCallEntry previousEntry = executions.get(index - 1);
+        validateRetriesTime(currentEntry, previousEntry, attemptsDelay);
+      }
+    }
+  }
+
+  private static void validateRetriesTime(
+      DummyCallbackService.CallbackCallEntry currentEntry,
+      DummyCallbackService.CallbackCallEntry previousEntry,
+      long attemptsDelay) {
+
+    Instant expectedRetriggerTime =
+        previousEntry
+            .getJobData()
+            .getMetadata()
+            .getLastTriggerTime()
+            .plus(attemptsDelay, ChronoUnit.MILLIS);
+    Instant retriggerInstant = currentEntry.getJobData().getMetadata().getLastTriggerTime();
+    if (expectedRetriggerTime.plus(50, ChronoUnit.MILLIS).isBefore(retriggerInstant)
+        || expectedRetriggerTime.minus(50, ChronoUnit.MILLIS).isAfter(retriggerInstant)) {
+      Assertions.fail("Retrigger instant of a reattempt is out of time");
     }
   }
 
