@@ -30,7 +30,7 @@ public class AmqpConfiguration {
   @EventListener({ContextRefreshedEvent.class})
   void contextRefreshedEvent() {
     Map<String, Object> serverProperties =
-        rabbitTemplate.execute((channel) -> channel.getConnection().getServerProperties());
+        rabbitTemplate.execute(channel -> channel.getConnection().getServerProperties());
     log.debug("Auto boot RabbitMQ call performed. Server details {}", serverProperties);
   }
 }

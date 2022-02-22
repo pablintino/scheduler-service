@@ -125,7 +125,7 @@ public class JobParamsEncoder implements IJobParamsEncoder {
           .encodeToString(
               objectMapper
                   .writeValueAsString(
-                      task.getTaskData() != null ? task.getTaskData() : Collections.EMPTY_MAP)
+                      task.getTaskData() != null ? task.getTaskData() : Collections.emptyMap())
                   .getBytes(StandardCharsets.UTF_8));
 
     } catch (JsonProcessingException ex) {

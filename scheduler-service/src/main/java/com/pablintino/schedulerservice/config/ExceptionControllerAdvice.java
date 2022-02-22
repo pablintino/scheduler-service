@@ -1,5 +1,6 @@
 package com.pablintino.schedulerservice.config;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.pablintino.services.commons.exceptions.GenericHttpServiceException;
 import com.pablintino.services.commons.exceptions.ValidationHttpServiceException;
@@ -54,7 +55,9 @@ public class ExceptionControllerAdvice {
     if (ex.getCause() instanceof MismatchedInputException) {
       String fieldName =
           ((MismatchedInputException) ex.getCause())
-              .getPath().stream().map(ef -> ef.getFieldName()).collect(Collectors.joining("."));
+              .getPath().stream()
+                  .map(JsonMappingException.Reference::getFieldName)
+                  .collect(Collectors.joining("."));
       errors.put(fieldName, ExceptionUtils.getRootCause(ex).getMessage());
     }
 

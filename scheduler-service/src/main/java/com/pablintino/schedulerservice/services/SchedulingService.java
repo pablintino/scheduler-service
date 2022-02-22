@@ -98,14 +98,12 @@ public class SchedulingService implements ISchedulingService {
         String cronExpression =
             trigger instanceof CronTrigger ? ((CronTrigger) trigger).getCronExpression() : null;
 
-        Task task =
-            new Task(
-                jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
-                jobKey.getGroup(),
-                ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
-                cronExpression,
-                jobParamsEncoder.getDecodeTaskData(jobDetail.getJobDataMap()));
-        return task;
+        return new Task(
+            jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
+            jobKey.getGroup(),
+            ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
+            cronExpression,
+            jobParamsEncoder.getDecodeTaskData(jobDetail.getJobDataMap()));
       }
       throw new SchedulingException("Unexpected trigger count found for " + jobKey + " job");
     }
