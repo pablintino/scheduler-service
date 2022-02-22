@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,13 +52,13 @@ class SchedulesControllerIT {
 
   @Autowired private DummyCallbackService dummyCallbackService;
 
-  @Autowired private Scheduler scheduler;
-
   @Autowired private DummyTasksProvider dummyTasksProvider;
 
   @Autowired private ExceptionControllerAdvice exceptionControllerAdvice;
 
   @Autowired private SchedulesController schedulesController;
+
+  @Autowired private QuartzJobListener jobListener;
 
   private MockMvc mockMvc;
 
@@ -79,6 +80,13 @@ class SchedulesControllerIT {
     @Bean
     public DummyTasksProvider dummyTasksProvider(JobParamsEncoder jobParamsEncoder) {
       return new DummyTasksProvider(jobParamsEncoder);
+    }
+
+    @Bean
+    QuartzJobListener jobListener(Scheduler scheduler) throws SchedulerException {
+      QuartzJobListener listener = new QuartzJobListener();
+      scheduler.getListenerManager().addJobListener(listener);
+      return listener;
     }
 
     @Bean
@@ -127,9 +135,6 @@ class SchedulesControllerIT {
   @Test
   @DirtiesContext
   void postTaskOK() throws Exception {
-    QuartzJobListener listener = new QuartzJobListener();
-    scheduler.getListenerManager().addJobListener(listener);
-
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 2000);
 
     mockMvc
@@ -145,7 +150,7 @@ class SchedulesControllerIT {
             MockMvcResultMatchers.jsonPath(
                 "$.taskKey", Matchers.is(testModels.getTask().getKey())));
 
-    QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(3000);
+    QuartzJobListener.JobExecutionEntry jobExecution = jobListener.waitJobExecution(3000);
     Assertions.assertNotNull(jobExecution);
     Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
@@ -156,9 +161,6 @@ class SchedulesControllerIT {
   @Test
   @DirtiesContext
   void postCronTaskOK() throws Exception {
-    QuartzJobListener listener = new QuartzJobListener();
-    scheduler.getListenerManager().addJobListener(listener);
-
     DummyTaskDataModels testModels =
         dummyTasksProvider.createCronValidJob("test-job1", 1000, " 0/2 * * * * ? *");
 
@@ -175,7 +177,8 @@ class SchedulesControllerIT {
             MockMvcResultMatchers.jsonPath(
                 "$.taskKey", Matchers.is(testModels.getTask().getKey())));
 
-    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 5000);
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        jobListener.waitJobExecutions(2, 5000);
     Assertions.assertEquals(2, dummyCallbackService.getExecutions().size());
     dummyTasksProvider.validateCronValidJob(
         testModels,
@@ -186,9 +189,6 @@ class SchedulesControllerIT {
   @Test
   @DirtiesContext
   void deleteValidTaskOK() throws Exception {
-    QuartzJobListener listener = new QuartzJobListener();
-    scheduler.getListenerManager().addJobListener(listener);
-
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 3000);
 
     mockMvc
@@ -212,7 +212,7 @@ class SchedulesControllerIT {
                 testModels.getTask().getId()))
         .andExpect(MockMvcResultMatchers.status().isNoContent());
 
-    QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(3000);
+    QuartzJobListener.JobExecutionEntry jobExecution = jobListener.waitJobExecution(3000);
     Assertions.assertNull(jobExecution);
     Assertions.assertEquals(0, dummyCallbackService.getExecutions().size());
   }

@@ -34,11 +34,11 @@ class SchedulerServiceIT {
 
   @Autowired private DummyCallbackService dummyCallbackService;
 
-  @Autowired private Scheduler scheduler;
-
   @Autowired private ISchedulingService schedulingService;
 
   @Autowired private DummyTasksProvider dummyTasksProvider;
+
+  @Autowired private QuartzJobListener jobListener;
 
   @Configuration
   @Import(InMemoryQuartzConfiguration.class)
@@ -52,6 +52,13 @@ class SchedulerServiceIT {
     @Bean
     public DummyCallbackService callbackService(ObjectMapper objectMapper) {
       return new DummyCallbackService(objectMapper);
+    }
+
+    @Bean
+    QuartzJobListener jobListener(Scheduler scheduler) throws SchedulerException {
+      QuartzJobListener listener = new QuartzJobListener();
+      scheduler.getListenerManager().addJobListener(listener);
+      return listener;
     }
 
     @Bean
@@ -79,13 +86,10 @@ class SchedulerServiceIT {
   @Test
   @DirtiesContext
   void simpleScheduleTaskOK() throws SchedulerException {
-    QuartzJobListener listener = new QuartzJobListener();
-    scheduler.getListenerManager().addJobListener(listener);
-
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 
-    QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(1500);
+    QuartzJobListener.JobExecutionEntry jobExecution = jobListener.waitJobExecution(1500);
     Assertions.assertNotNull(jobExecution);
     Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
@@ -96,10 +100,6 @@ class SchedulerServiceIT {
   @Test
   @DirtiesContext
   void getTasksOK() throws SchedulerException {
-
-    QuartzJobListener listener = new QuartzJobListener();
-    scheduler.getListenerManager().addJobListener(listener);
-
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 2000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 
@@ -120,7 +120,8 @@ class SchedulerServiceIT {
             .filter(t -> testModels2.getTask().getId().equals(t.getId()))
             .findFirst()
             .orElse(null));
-    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 3000);
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        jobListener.waitJobExecutions(2, 3000);
     Assertions.assertEquals(2, jobExecutions.size());
 
     DummyCallbackService.CallbackCallEntry callbackCallEntryJob1 =
@@ -170,10 +171,6 @@ class SchedulerServiceIT {
   @Test
   @DirtiesContext
   void deleteTaskOK() throws SchedulerException {
-
-    QuartzJobListener listener = new QuartzJobListener();
-    scheduler.getListenerManager().addJobListener(listener);
-
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 
@@ -188,17 +185,14 @@ class SchedulerServiceIT {
 
     schedulingService.deleteTask(testModels.getTask().getKey(), testModels.getTask().getId());
 
-    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(1, 3000);
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        jobListener.waitJobExecutions(1, 3000);
     Assertions.assertEquals(0, jobExecutions.size());
   }
 
   @Test
   @DirtiesContext
   void getTaskOK() throws SchedulerException {
-
-    QuartzJobListener listener = new QuartzJobListener();
-    scheduler.getListenerManager().addJobListener(listener);
-
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 
@@ -210,7 +204,8 @@ class SchedulerServiceIT {
     Assertions.assertNull(
         schedulingService.getTask(UUID.randomUUID().toString(), testModels.getTask().getId()));
 
-    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 2000);
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        jobListener.waitJobExecutions(2, 2000);
     Assertions.assertEquals(1, jobExecutions.size());
 
     Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
