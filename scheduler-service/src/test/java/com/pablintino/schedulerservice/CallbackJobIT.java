@@ -65,8 +65,8 @@ class CallbackJobIT {
     }
 
     @Bean
-    public DummyCallbackService callbackService() {
-      return new DummyCallbackService();
+    public DummyCallbackService callbackService(ObjectMapper objectMapper) {
+      return new DummyCallbackService(objectMapper);
     }
 
     @Bean
@@ -94,11 +94,26 @@ class CallbackJobIT {
     Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
         dummyCallbackService.getExecutions().peek();
-    dummyTasksProvider.validateSimpleValidJob(
+    dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecution);
+  }
+
+  @Test
+  @DirtiesContext
+  void cronScheduledExecutionOK() throws SchedulerException {
+    QuartzJobListener listener = new QuartzJobListener();
+    scheduler.getListenerManager().addJobListener(listener);
+
+    DummyTaskDataModels testModels =
+        dummyTasksProvider.createCronValidJob("test-job1", 1000, " 0/2 * * * * ? *");
+    scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
+
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 5000);
+    Assertions.assertNotNull(jobExecutions);
+
+    dummyTasksProvider.validateCronValidJob(
         testModels,
-        callbackCallEntry.getJobData(),
-        callbackCallEntry.getTaskDataMap(),
-        callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+        dummyCallbackService.getExecutions().stream().collect(Collectors.toList()),
+        jobExecutions);
   }
 
   @Test
@@ -120,11 +135,7 @@ class CallbackJobIT {
     Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
         dummyCallbackService.getExecutions().peek();
-    dummyTasksProvider.validateSimpleValidJob(
-        testModels,
-        callbackCallEntry.getJobData(),
-        callbackCallEntry.getTaskDataMap(),
-        callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+    dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecution);
 
     Assertions.assertEquals(0, listener.getExecutions().size());
     Assertions.assertEquals(false, jobExecution.getEx().refireImmediately());
@@ -173,7 +184,7 @@ class CallbackJobIT {
     scheduler.getListenerManager().addJobListener(listener);
     dummyCallbackService.setCallback(
         (s, j) -> {
-          if (s.getMetadata().getExecutions() < 2) {
+          if (s.getMetadata().getExecutions() < 3) {
             throw new RuntimeException("test exception");
           }
         });
@@ -187,21 +198,20 @@ class CallbackJobIT {
 
     List<QuartzJobListener.JobExecutionEntry> jobExecutions =
         listener.waitJobExecutions(
-            3, Math.round(Math.ceil((failureAttempts + 1) * failureAttemptDelay * 1.1)));
+            4, (int) Math.floor((Math.ceil((2) * failureAttemptDelay) + 2000 * 3) * 1.1));
 
     /* Ensure trigger has not being deleted */
     Assertions.assertNotNull(scheduler.getTrigger(testModels.getTrigger().getKey()));
 
     /* Delete trigger to prevent jobs to being launched while checking results*/
     scheduler.unscheduleJob(testModels.getTrigger().getKey());
-    Assertions.assertEquals(3, jobExecutions.size());
-    Assertions.assertEquals(3, dummyCallbackService.getExecutions().size());
+    Assertions.assertEquals(4, jobExecutions.size());
+    Assertions.assertEquals(4, dummyCallbackService.getExecutions().size());
 
     dummyTasksProvider.validateReattemptedAndRecoveredJob(
         testModels,
         dummyCallbackService.getExecutions().stream().collect(Collectors.toList()),
-        failureAttempts,
         failureAttemptDelay,
-        3);
+        2);
   }
 }

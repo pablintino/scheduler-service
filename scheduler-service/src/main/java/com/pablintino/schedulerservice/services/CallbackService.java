@@ -115,7 +115,7 @@ public class CallbackService implements ICallbackService {
         schedulerJobData.getTaskId(),
         schedulerJobData.getKey(),
         taskDataMap,
-        schedulerJobData.getMetadata().getLastTriggerTime(),
+        schedulerJobData.getMetadata().getTriggerTime(),
         schedulerJobData.getMetadata().getNotificationAttempt());
   }
 }

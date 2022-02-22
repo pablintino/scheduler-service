@@ -50,8 +50,8 @@ class SchedulerServiceIT {
     }
 
     @Bean
-    public DummyCallbackService callbackService() {
-      return new DummyCallbackService();
+    public DummyCallbackService callbackService(ObjectMapper objectMapper) {
+      return new DummyCallbackService(objectMapper);
     }
 
     @Bean
@@ -90,11 +90,7 @@ class SchedulerServiceIT {
     Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
         dummyCallbackService.getExecutions().peek();
-    dummyTasksProvider.validateSimpleValidJob(
-        testModels,
-        callbackCallEntry.getJobData(),
-        callbackCallEntry.getTaskDataMap(),
-        callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+    dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecution);
   }
 
   @Test
@@ -127,23 +123,48 @@ class SchedulerServiceIT {
     List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 3000);
     Assertions.assertEquals(2, jobExecutions.size());
 
-    DummyCallbackService.CallbackCallEntry callbackCallEntry =
-        dummyCallbackService.getExecutions().peek();
-    if (testModels.getTask().getId().equals(callbackCallEntry.getJobData().getTaskId())) {
-      dummyTasksProvider.validateSimpleValidJob(
-          testModels,
-          callbackCallEntry.getJobData(),
-          callbackCallEntry.getTaskDataMap(),
-          callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
-    } else if (testModels2.getTask().getId().equals(callbackCallEntry.getJobData().getTaskId())) {
-      dummyTasksProvider.validateSimpleValidJob(
-          testModels2,
-          callbackCallEntry.getJobData(),
-          callbackCallEntry.getTaskDataMap(),
-          callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
-    } else {
-      Assertions.fail("Unexpected task");
-    }
+    DummyCallbackService.CallbackCallEntry callbackCallEntryJob1 =
+        dummyCallbackService.getExecutions().stream()
+            .filter(
+                ce ->
+                    ce.getJobData().getKey().equals(testModels.getTask().getKey())
+                        && ce.getJobData().getTaskId().equals(testModels.getTask().getId()))
+            .findFirst()
+            .orElseThrow();
+    DummyCallbackService.CallbackCallEntry callbackCallEntryJob2 =
+        dummyCallbackService.getExecutions().stream()
+            .filter(
+                ce ->
+                    ce.getJobData().getKey().equals(testModels2.getTask().getKey())
+                        && ce.getJobData().getTaskId().equals(testModels2.getTask().getId()))
+            .findFirst()
+            .orElseThrow();
+
+    dummyTasksProvider.validateSimpleValidJob(
+        testModels,
+        callbackCallEntryJob1,
+        jobExecutions.stream()
+            .filter(
+                je ->
+                    je.getJobExecutionContext()
+                        .getTrigger()
+                        .getKey()
+                        .equals(testModels.getTrigger().getKey()))
+            .findFirst()
+            .orElseThrow());
+
+    dummyTasksProvider.validateSimpleValidJob(
+        testModels2,
+        callbackCallEntryJob2,
+        jobExecutions.stream()
+            .filter(
+                je ->
+                    je.getJobExecutionContext()
+                        .getTrigger()
+                        .getKey()
+                        .equals(testModels2.getTrigger().getKey()))
+            .findFirst()
+            .orElseThrow());
   }
 
   @Test
@@ -196,10 +217,6 @@ class SchedulerServiceIT {
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
         dummyCallbackService.getExecutions().peek();
 
-    dummyTasksProvider.validateSimpleValidJob(
-        testModels,
-        callbackCallEntry.getJobData(),
-        callbackCallEntry.getTaskDataMap(),
-        callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+    dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecutions.get(0));
   }
 }

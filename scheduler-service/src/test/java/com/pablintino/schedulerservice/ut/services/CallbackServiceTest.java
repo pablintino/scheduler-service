@@ -48,7 +48,7 @@ public class CallbackServiceTest {
     map.put("test-key", "test");
     ScheduleJobMetadata scheduleEventMetadata = new ScheduleJobMetadata();
     scheduleEventMetadata.setNotificationAttempt(0);
-    scheduleEventMetadata.setLastTriggerTime(Instant.now());
+    scheduleEventMetadata.setTriggerTime(Instant.now());
     SchedulerJobData schedulerJobData =
         new SchedulerJobData(
             DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, scheduleEventMetadata);
@@ -62,7 +62,7 @@ public class CallbackServiceTest {
             DUMMY_ID_NAME,
             DUMMY_KEY_NAME,
             map.getWrappedMap(),
-            scheduleEventMetadata.getLastTriggerTime(),
+            scheduleEventMetadata.getTriggerTime(),
             scheduleEventMetadata.getNotificationAttempt());
     Mockito.verify(rabbitTemplate, Mockito.times(1))
         .convertAndSend(DUMMY_EXCHANGE_NAME, DUMMY_KEY_NAME, expectedMessage);
@@ -80,7 +80,7 @@ public class CallbackServiceTest {
     map.put("test-key", "test");
     ScheduleJobMetadata scheduleEventMetadata = new ScheduleJobMetadata();
     scheduleEventMetadata.setNotificationAttempt(0);
-    scheduleEventMetadata.setLastTriggerTime(Instant.now());
+    scheduleEventMetadata.setTriggerTime(Instant.now());
     SchedulerJobData schedulerJobData =
         new SchedulerJobData(
             DUMMY_ID_NAME, DUMMY_KEY_NAME, null, CallbackType.AMQP, scheduleEventMetadata);

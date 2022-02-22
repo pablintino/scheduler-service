@@ -56,7 +56,7 @@ public class SchedulingDtoMapper implements ISchedulingDtoMapper {
   public TaskStatsDto toTaskStatsDto(ScheduleJobMetadata scheduleJobMetadata) {
     TaskStatsDto taskStatsDto = new TaskStatsDto();
     taskStatsDto.setExecutions(scheduleJobMetadata.getExecutions());
-    taskStatsDto.setLastTriggerTime(scheduleJobMetadata.getLastTriggerTime());
+    taskStatsDto.setLastTriggerTime(scheduleJobMetadata.getTriggerTime());
     taskStatsDto.setFailures(scheduleJobMetadata.getFailures());
     taskStatsDto.setLastFailureTime(scheduleJobMetadata.getLastFailureTime());
     return taskStatsDto;

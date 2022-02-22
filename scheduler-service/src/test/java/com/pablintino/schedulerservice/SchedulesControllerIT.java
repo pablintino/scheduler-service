@@ -79,8 +79,8 @@ class SchedulesControllerIT {
     }
 
     @Bean
-    public DummyCallbackService callbackService() {
-      return new DummyCallbackService();
+    public DummyCallbackService callbackService(ObjectMapper objectMapper) {
+      return new DummyCallbackService(objectMapper);
     }
 
     @Bean
@@ -147,11 +147,7 @@ class SchedulesControllerIT {
     Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
         dummyCallbackService.getExecutions().peek();
-    dummyTasksProvider.validateSimpleValidJob(
-        testModels,
-        callbackCallEntry.getJobData(),
-        callbackCallEntry.getTaskDataMap(),
-        callbackCallEntry.getJobData().getMetadata().getLastTriggerTime());
+    dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecution);
   }
 
   @Test

@@ -89,7 +89,7 @@ public class CallbackJob implements Job {
 
   private static void preUpdateExecutionMetadata(
       ScheduleJobMetadata scheduleJobMetadata, JobExecutionContext context) {
-    scheduleJobMetadata.setLastTriggerTime(context.getFireTime().toInstant());
+    scheduleJobMetadata.setTriggerTime(context.getFireTime().toInstant());
     scheduleJobMetadata.setExecutions(scheduleJobMetadata.getExecutions() + 1);
   }
 
@@ -112,7 +112,7 @@ public class CallbackJob implements Job {
                   + " reschedule attempt "
                   + attemptNumber);
 
-          Trigger trigger = rebuildTrigger(jobExecutionContext, retrialAttempts);
+          Trigger trigger = rebuildTrigger(jobExecutionContext);
           jobExecutionContext
               .getScheduler()
               .rescheduleJob(jobExecutionContext.getTrigger().getKey(), trigger);
@@ -162,7 +162,7 @@ public class CallbackJob implements Job {
     throw new JobExecutionException(false);
   }
 
-  private Trigger rebuildTrigger(JobExecutionContext jobExecutionContext, long attemptNumber) {
+  private Trigger rebuildTrigger(JobExecutionContext jobExecutionContext) {
     ScheduleBuilder scheduleBuilder =
         jobExecutionContext.getTrigger() instanceof CronTrigger
             ? CronScheduleBuilder.cronSchedule(

@@ -38,7 +38,7 @@ class CallbackServiceAMQPIntegrationIT {
     map.put("test-key", "test");
     ScheduleJobMetadata scheduleEventMetadata = new ScheduleJobMetadata();
     scheduleEventMetadata.setNotificationAttempt(1);
-    scheduleEventMetadata.setLastTriggerTime(Instant.now());
+    scheduleEventMetadata.setTriggerTime(Instant.now());
     SchedulerJobData schedulerJobData =
         new SchedulerJobData(
             "test",
@@ -56,7 +56,7 @@ class CallbackServiceAMQPIntegrationIT {
     Assertions.assertEquals(map.getWrappedMap(), message.getDataMap());
     Assertions.assertEquals(
         scheduleEventMetadata.getNotificationAttempt(), message.getNotificationAttempt());
-    Assertions.assertEquals(scheduleEventMetadata.getLastTriggerTime(), message.getTriggerTime());
+    Assertions.assertEquals(scheduleEventMetadata.getTriggerTime(), message.getTriggerTime());
   }
 
   @RabbitListener(queues = {AmqpTestIntegrationConfiguration.QUEUE_KEY})
