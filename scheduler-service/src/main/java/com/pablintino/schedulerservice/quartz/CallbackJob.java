@@ -135,7 +135,9 @@ public class CallbackJob implements Job {
 
     /* Increment failure count and set last failure instant */
     schedulerJobData.getMetadata().setFailures(schedulerJobData.getMetadata().getFailures() + 1);
-    schedulerJobData.getMetadata().setLastFailureTime(Instant.now());
+    schedulerJobData
+        .getMetadata()
+        .setLastFailureTime(jobExecutionContext.getFireTime().toInstant());
 
     throw !rescheduled
         ? deleteFiringTrigger(jobExecutionContext, ex)

@@ -40,6 +40,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 class SchedulesControllerIT {
@@ -148,6 +151,36 @@ class SchedulesControllerIT {
     DummyCallbackService.CallbackCallEntry callbackCallEntry =
         dummyCallbackService.getExecutions().peek();
     dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecution);
+  }
+
+  @Test
+  @DirtiesContext
+  void postCronTaskOK() throws Exception {
+    QuartzJobListener listener = new QuartzJobListener();
+    scheduler.getListenerManager().addJobListener(listener);
+
+    DummyTaskDataModels testModels =
+        dummyTasksProvider.createCronValidJob("test-job1", 1000, " 0/2 * * * * ? *");
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/schedules")
+                .content(objectMapper.writeValueAsString(testModels.getScheduleRequestDto()))
+                .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(
+            MockMvcResultMatchers.jsonPath(
+                "$.taskIdentifier", Matchers.is(testModels.getTask().getId())))
+        .andExpect(
+            MockMvcResultMatchers.jsonPath(
+                "$.taskKey", Matchers.is(testModels.getTask().getKey())));
+
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions = listener.waitJobExecutions(2, 5000);
+    Assertions.assertEquals(2, dummyCallbackService.getExecutions().size());
+    dummyTasksProvider.validateCronValidJob(
+        testModels,
+        dummyCallbackService.getExecutions().stream().collect(Collectors.toList()),
+        jobExecutions);
   }
 
   @Test

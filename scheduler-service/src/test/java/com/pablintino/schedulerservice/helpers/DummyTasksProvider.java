@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Assertions;
 import org.quartz.*;
 import org.springframework.stereotype.Component;
 
+import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -102,50 +103,82 @@ public class DummyTasksProvider {
 
   public void validateSimpleValidReattemptedNotRecoveredJob(
       DummyTaskDataModels dummyTaskDataModels,
-      List<DummyCallbackService.CallbackCallEntry> executions,
+      List<DummyCallbackService.CallbackCallEntry> callbackEntries,
+      List<QuartzJobListener.JobExecutionEntry> executions,
       int retries,
       long attemptsDelay) {
-    Assertions.assertEquals(retries + 1, executions.size());
-    for (int index = 0; index < executions.size(); index++) {
-      DummyCallbackService.CallbackCallEntry currentEntry = executions.get(index);
+    Assertions.assertEquals(retries + 1, callbackEntries.size());
+    Assertions.assertEquals(executions.size(), callbackEntries.size());
+
+    for (int index = 0; index < callbackEntries.size(); index++) {
+      DummyCallbackService.CallbackCallEntry currentEntry = callbackEntries.get(index);
+      QuartzJobListener.JobExecutionEntry currentExecution = executions.get(index);
       validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.getJobData());
-      // TODO Improve this checks. Too basic
 
       Assertions.assertEquals(index + 1, currentEntry.getJobData().getMetadata().getExecutions());
+
       /* First execution should contain zero failures. Then this field should increment counter-like */
       Assertions.assertEquals(index, currentEntry.getJobData().getMetadata().getFailures());
+
       /* First execution is attempt 0. Then this field should increment counter-like */
       Assertions.assertEquals(
           index, currentEntry.getJobData().getMetadata().getNotificationAttempt());
+
       /* Ensure task data has not changed (User data given as task data should be equal to the one provided on creation */
       Assertions.assertEquals(
           dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskDataMap());
 
-      if (index > 0) {
+      /* Ensure reported trigger time is the same as the real one */
+      Assertions.assertEquals(
+          currentEntry.getJobData().getMetadata().getTriggerTime(),
+          currentExecution.getJobExecutionContext().getFireTime().toInstant());
+
+      if (index == 0) {
+        /* Check that execution is in time */
+        Assertions.assertEquals(
+            currentExecution
+                .getJobExecutionContext()
+                .getFireTime()
+                .toInstant()
+                .truncatedTo(ChronoUnit.SECONDS),
+            dummyTaskDataModels
+                .getTrigger()
+                .getNextFireTime()
+                .toInstant()
+                .truncatedTo(ChronoUnit.SECONDS));
+      } else {
         /* Reattempts (index != 0) should contain the timestamp of the last failure */
         Assertions.assertNotNull(currentEntry.getJobData().getMetadata().getLastFailureTime());
 
-        DummyCallbackService.CallbackCallEntry previousEntry = executions.get(index - 1);
+        DummyCallbackService.CallbackCallEntry previousEntry = callbackEntries.get(index - 1);
         validateRetriesTime(
             currentEntry, previousEntry, attemptsDelay, dummyTaskDataModels.getTrigger());
       }
     }
   }
 
-  public void validateReattemptedAndRecoveredJob(
+  public void validateCronReattemptedAndRecoveredJob(
       DummyTaskDataModels dummyTaskDataModels,
-      List<DummyCallbackService.CallbackCallEntry> executions,
+      List<DummyCallbackService.CallbackCallEntry> callbackEntries,
+      List<QuartzJobListener.JobExecutionEntry> executions,
       long attemptsDelay,
       int recoverRetry) {
-    Assertions.assertTrue(recoverRetry + 1 < executions.size());
+    Assertions.assertTrue(recoverRetry + 1 < callbackEntries.size());
+    Assertions.assertEquals(callbackEntries.size(), executions.size());
 
-    for (int index = 0; index < executions.size(); index++) {
-      DummyCallbackService.CallbackCallEntry currentEntry = executions.get(index);
+    for (int index = 0; index < callbackEntries.size(); index++) {
+      DummyCallbackService.CallbackCallEntry currentEntry = callbackEntries.get(index);
+      QuartzJobListener.JobExecutionEntry currentExecution = executions.get(index);
       validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.getJobData());
 
       Assertions.assertEquals(index + 1, currentEntry.getJobData().getMetadata().getExecutions());
       Assertions.assertEquals(
           dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskDataMap());
+
+      /* Ensure reported trigger time is the same as the real one */
+      Assertions.assertEquals(
+          currentEntry.getJobData().getMetadata().getTriggerTime(),
+          currentExecution.getJobExecutionContext().getFireTime().toInstant());
 
       /* Reattempts (index != 0) should contain the timestamp of the last failure */
       if (index == 0) {
@@ -155,22 +188,41 @@ public class DummyTasksProvider {
         Assertions.assertEquals(
             0, currentEntry.getJobData().getMetadata().getNotificationAttempt());
 
+        /* Check that execution is in time */
+        Assertions.assertEquals(
+            currentExecution
+                .getJobExecutionContext()
+                .getFireTime()
+                .toInstant()
+                .truncatedTo(ChronoUnit.SECONDS),
+            dummyTaskDataModels
+                .getTrigger()
+                .getNextFireTime()
+                .toInstant()
+                .truncatedTo(ChronoUnit.SECONDS));
       } else if (index < recoverRetry) {
         // Retries
-        // TODO compare with previous trigger time instead this simple not null
-        Assertions.assertNotNull(currentEntry.getJobData().getMetadata().getLastFailureTime());
+        /* Ensure last failure time contains the timestamp of the previous triggered run */
+        Assertions.assertEquals(
+            executions.get(index - 1).getJobExecutionContext().getFireTime().toInstant(),
+            currentEntry.getJobData().getMetadata().getLastFailureTime());
+
         Assertions.assertEquals(index, currentEntry.getJobData().getMetadata().getFailures());
+
         /* Reattempts (index != 0) should contain the timestamp of the last failure. Despite recover succeed */
         Assertions.assertNotNull(currentEntry.getJobData().getMetadata().getLastFailureTime());
         validateRetriesTime(
             currentEntry,
-            executions.get(index - 1),
+            callbackEntries.get(index - 1),
             attemptsDelay,
             dummyTaskDataModels.getTrigger());
       } else {
         // Normal execution after failure
-        // TODO compare with previous trigger time instead this simple not null
-        Assertions.assertNotNull(currentEntry.getJobData().getMetadata().getLastFailureTime());
+        /* Ensure last failure time contains the timestamp of the previous failed run */
+        Assertions.assertEquals(
+            executions.get(recoverRetry - 1).getJobExecutionContext().getFireTime().toInstant(),
+            currentEntry.getJobData().getMetadata().getLastFailureTime());
+
         Assertions.assertEquals(
             recoverRetry, currentEntry.getJobData().getMetadata().getFailures());
 
@@ -178,15 +230,104 @@ public class DummyTasksProvider {
         Assertions.assertNotNull(currentEntry.getJobData().getMetadata().getLastFailureTime());
 
         /* After recover the first callback should contain the notification attempt number. After that attempt the counter is reset */
-        if (recoverRetry == index) {
-          Assertions.assertEquals(
-              recoverRetry, currentEntry.getJobData().getMetadata().getNotificationAttempt());
-        } else {
-          Assertions.assertEquals(
-              0, currentEntry.getJobData().getMetadata().getNotificationAttempt());
-        }
+        Assertions.assertEquals(
+            recoverRetry == index ? recoverRetry : 0,
+            currentEntry.getJobData().getMetadata().getNotificationAttempt());
       }
     }
+  }
+
+  public void validateSimpleValidJob(
+      DummyTaskDataModels dummyTaskDataModels,
+      DummyCallbackService.CallbackCallEntry callbackCallEntry,
+      QuartzJobListener.JobExecutionEntry jobExecution) {
+    validateCommonSchedulerDataParams(dummyTaskDataModels, callbackCallEntry.getJobData());
+
+    /* Ensure that the task has been executed in time (50ms toleration) */
+    Assertions.assertEquals(
+        jobExecution
+            .getJobExecutionContext()
+            .getFireTime()
+            .toInstant()
+            .truncatedTo(ChronoUnit.SECONDS),
+        dummyTaskDataModels.getTask().getTriggerTime().toInstant().truncatedTo(ChronoUnit.SECONDS));
+
+    /* Ensure reported trigger time is the same as the real one */
+    Assertions.assertEquals(
+        callbackCallEntry.getJobData().getMetadata().getTriggerTime(),
+        jobExecution.getJobExecutionContext().getFireTime().toInstant());
+
+    /* Ensure user data at task map is preserved without changes */
+    Assertions.assertEquals(
+        dummyTaskDataModels.getTask().getTaskData(), callbackCallEntry.getTaskDataMap());
+  }
+
+  public void validateCronValidJob(
+      DummyTaskDataModels dummyTaskDataModels,
+      List<DummyCallbackService.CallbackCallEntry> callbackEntries,
+      List<QuartzJobListener.JobExecutionEntry> executions) {
+
+    Assertions.assertFalse(executions.isEmpty());
+    Assertions.assertEquals(callbackEntries.size(), executions.size());
+
+    for (int index = 0; index < executions.size(); index++) {
+      QuartzJobListener.JobExecutionEntry execution = executions.get(index);
+      DummyCallbackService.CallbackCallEntry entry = callbackEntries.get(index);
+
+      SchedulerJobData jobData = entry.getJobData();
+
+      /* Assert common simple stuff */
+      validateCommonSchedulerDataParams(dummyTaskDataModels, jobData);
+
+      /* Ensure that the task has been executed in time (within a second) */
+      if (index == 0) {
+        /* Simple truncation doesn't work for a cron first run. That's why here the difference between both instants is used */
+        Assertions.assertTrue(
+            Math.abs(
+                    Duration.between(
+                            execution.getJobExecutionContext().getFireTime().toInstant(),
+                            dummyTaskDataModels.getTask().getTriggerTime().toInstant())
+                        .toMillis())
+                < 1000);
+      } else {
+        CronExpression expression = null;
+        try {
+          expression = new CronExpression(dummyTaskDataModels.getTask().getCronExpression());
+        } catch (ParseException e) {
+          Assertions.fail("Cron expression is not valid");
+        }
+        Assertions.assertEquals(
+            expression
+                .getNextValidTimeAfter(
+                    executions.get(index - 1).getJobExecutionContext().getFireTime())
+                .toInstant()
+                .truncatedTo(ChronoUnit.SECONDS),
+            execution
+                .getJobExecutionContext()
+                .getFireTime()
+                .toInstant()
+                .truncatedTo(ChronoUnit.SECONDS));
+      }
+
+      /* Ensure reported trigger time is the same as the real one */
+      Assertions.assertEquals(
+          jobData.getMetadata().getTriggerTime(),
+          execution.getJobExecutionContext().getFireTime().toInstant());
+
+      /* Ensure user data at task map is preserved without changes */
+      Assertions.assertEquals(dummyTaskDataModels.getTask().getTaskData(), entry.getTaskDataMap());
+    }
+  }
+
+  private static void validateCommonSchedulerDataParams(
+      DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData) {
+    Assertions.assertEquals(dummyTaskDataModels.getTask().getId(), jobData.getTaskId());
+    Assertions.assertEquals(dummyTaskDataModels.getTask().getKey(), jobData.getKey());
+    Assertions.assertEquals(
+        dummyTaskDataModels.getEndpoint().getCallbackUrl(), jobData.getCallbackUrl());
+    Assertions.assertEquals(dummyTaskDataModels.getEndpoint().getCallbackType(), jobData.getType());
+    Assertions.assertNotNull(jobData.getMetadata());
+    Assertions.assertNotNull(jobData.getMetadata().getTriggerTime());
   }
 
   @SneakyThrows
@@ -221,102 +362,8 @@ public class DummyTasksProvider {
       Assertions.fail("Not supported trigger type");
     }
 
-    Instant retriggerInstant = currentEntry.getJobData().getMetadata().getTriggerTime();
-
-    if (expectedRetriggerTime.plus(50, ChronoUnit.MILLIS).isBefore(retriggerInstant)
-        || expectedRetriggerTime.minus(50, ChronoUnit.MILLIS).isAfter(retriggerInstant)) {
-      Assertions.fail("Re-trigger instant of a reattempt is out of time");
-    }
-  }
-
-  public void validateSimpleValidJob(
-      DummyTaskDataModels dummyTaskDataModels,
-      DummyCallbackService.CallbackCallEntry callbackCallEntry,
-      QuartzJobListener.JobExecutionEntry jobExecution) {
-    validateCommonSchedulerDataParams(dummyTaskDataModels, callbackCallEntry.getJobData());
-
-    /* Ensure that the task has been executed in time (50ms toleration) */
-    Assertions.assertTrue(
-        Math.abs(
-                Duration.between(
-                        jobExecution.getJobExecutionContext().getFireTime().toInstant(),
-                        dummyTaskDataModels.getTask().getTriggerTime().toInstant())
-                    .toMillis())
-            <= 50);
-
-    /* Ensure reported trigger time is the same as the real one */
     Assertions.assertEquals(
-        callbackCallEntry.getJobData().getMetadata().getTriggerTime(),
-        jobExecution.getJobExecutionContext().getFireTime().toInstant());
-
-    /* Ensure user data at task map is preserved without changes */
-    Assertions.assertEquals(
-        dummyTaskDataModels.getTask().getTaskData(), callbackCallEntry.getTaskDataMap());
-  }
-
-  @SneakyThrows
-  public void validateCronValidJob(
-      DummyTaskDataModels dummyTaskDataModels,
-      List<DummyCallbackService.CallbackCallEntry> callbackEntries,
-      List<QuartzJobListener.JobExecutionEntry> executions) {
-
-    Assertions.assertFalse(executions.isEmpty());
-    Assertions.assertEquals(callbackEntries.size(), executions.size());
-
-    for (int index = 0; index < executions.size(); index++) {
-      QuartzJobListener.JobExecutionEntry execution = executions.get(index);
-      DummyCallbackService.CallbackCallEntry entry = callbackEntries.get(index);
-
-      SchedulerJobData jobData = entry.getJobData();
-
-      /* Assert common simple stuff */
-      validateCommonSchedulerDataParams(dummyTaskDataModels, jobData);
-
-      /* Ensure that the task has been executed in time (50ms toleration) */
-      if (index == 0) {
-        Assertions.assertTrue(
-            Math.abs(
-                    Duration.between(
-                            execution.getJobExecutionContext().getFireTime().toInstant(),
-                            dummyTaskDataModels.getTrigger().getNextFireTime().toInstant())
-                        .toMillis())
-                <= 50);
-      } else {
-        CronExpression expression =
-            new CronExpression(dummyTaskDataModels.getTask().getCronExpression());
-        Assertions.assertTrue(
-            Math.abs(
-                    Duration.between(
-                            expression
-                                .getNextValidTimeAfter(
-                                    executions
-                                        .get(index - 1)
-                                        .getJobExecutionContext()
-                                        .getFireTime())
-                                .toInstant(),
-                            execution.getJobExecutionContext().getFireTime().toInstant())
-                        .toMillis())
-                <= 50);
-      }
-
-      /* Ensure reported trigger time is the same as the real one */
-      Assertions.assertEquals(
-          jobData.getMetadata().getTriggerTime(),
-          execution.getJobExecutionContext().getFireTime().toInstant());
-
-      /* Ensure user data at task map is preserved without changes */
-      Assertions.assertEquals(dummyTaskDataModels.getTask().getTaskData(), entry.getTaskDataMap());
-    }
-  }
-
-  private static void validateCommonSchedulerDataParams(
-      DummyTaskDataModels dummyTaskDataModels, SchedulerJobData jobData) {
-    Assertions.assertEquals(dummyTaskDataModels.getTask().getId(), jobData.getTaskId());
-    Assertions.assertEquals(dummyTaskDataModels.getTask().getKey(), jobData.getKey());
-    Assertions.assertEquals(
-        dummyTaskDataModels.getEndpoint().getCallbackUrl(), jobData.getCallbackUrl());
-    Assertions.assertEquals(dummyTaskDataModels.getEndpoint().getCallbackType(), jobData.getType());
-    Assertions.assertNotNull(jobData.getMetadata());
-    Assertions.assertNotNull(jobData.getMetadata().getTriggerTime());
+        currentEntry.getJobData().getMetadata().getTriggerTime().truncatedTo(ChronoUnit.SECONDS),
+        expectedRetriggerTime.truncatedTo(ChronoUnit.SECONDS));
   }
 }
