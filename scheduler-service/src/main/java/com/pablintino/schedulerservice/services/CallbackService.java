@@ -65,8 +65,7 @@ public class CallbackService implements ICallbackService {
       Throwable rootCause = ExceptionUtils.getRootCause(ex);
       if (rootCause != null
           && !rootCause.equals(ex)
-          && (IOException.class.isAssignableFrom(rootCause.getClass())
-              || ConnectException.class.isAssignableFrom(rootCause.getClass()))) {
+          && (IOException.class.isAssignableFrom(rootCause.getClass()))) {
         throw new RemoteUnreachableException(ex);
       }
       throw ex;

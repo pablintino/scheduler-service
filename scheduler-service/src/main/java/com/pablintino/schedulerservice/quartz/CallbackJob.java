@@ -1,6 +1,5 @@
 package com.pablintino.schedulerservice.quartz;
 
-import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.models.ScheduleJobMetadata;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
 import com.pablintino.schedulerservice.quartz.annotations.IReeschedulableAnnotationResolver;
@@ -42,12 +41,6 @@ public class CallbackJob implements Job {
 
       /* Succeed, reset notification attempts */
       resetNotificationAttempts(schedulerJobData.getMetadata());
-
-    } catch (SchedulerValidationException schedulerValidationException) {
-      log.error(
-          "Unable to decode job parameters. Canceling job " + context.getJobDetail().getKey(),
-          schedulerValidationException);
-      throw new JobExecutionException(schedulerValidationException, false);
     } catch (Exception ex) {
       manageFailure(ex, context, schedulerJobData);
     } finally {

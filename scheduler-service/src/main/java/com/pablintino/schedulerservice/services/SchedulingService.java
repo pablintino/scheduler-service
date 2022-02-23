@@ -8,7 +8,7 @@ import com.pablintino.schedulerservice.models.ScheduleJobMetadata;
 import com.pablintino.schedulerservice.models.Task;
 import com.pablintino.schedulerservice.quartz.CallbackJob;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.ClassUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.UrlValidator;
 import org.quartz.*;
@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SchedulingService implements ISchedulingService {
@@ -33,13 +34,14 @@ public class SchedulingService implements ISchedulingService {
   private final IJobParamsEncoder jobParamsEncoder;
 
   @Override
-  public void scheduleTask(Task task, Endpoint endpoint) {
+  public void scheduleTask(Task task, Endpoint endpoint) throws SchedulerValidationException {
     try {
 
       Trigger trigger = prepareNewTrigger(task);
       JobDetail job = prepareNewJob(task, endpoint);
       scheduler.scheduleJob(job, trigger);
     } catch (SchedulerException ex) {
+      log.error("Error scheduling job for task {} and endpoint {}", task, endpoint, ex);
       throw new SchedulingException("An error occurred when scheduling a job", ex);
     }
   }
@@ -50,6 +52,7 @@ public class SchedulingService implements ISchedulingService {
     try {
       scheduler.deleteJob(jobKey);
     } catch (SchedulerException ex) {
+      log.error("Error deleting job for task key {} and id {}", taskKey, taskId, ex);
       throw new SchedulingException("An error occurred while deleting a task " + jobKey, ex);
     }
   }
@@ -62,6 +65,7 @@ public class SchedulingService implements ISchedulingService {
         tasks.add(getTaskFromJobKey(jobKey));
       }
     } catch (SchedulerException ex) {
+      log.error("Error retrieving tasks for {} key", key, ex);
       throw new SchedulingException("An exception occurred while retrieving task details.", ex);
     }
     return tasks;
@@ -69,11 +73,7 @@ public class SchedulingService implements ISchedulingService {
 
   @Override
   public Task getTask(String key, String taskId) {
-    try {
-      return getTaskFromJobKey(JobKey.jobKey(JOB_NAME_PREFIX + taskId, key));
-    } catch (SchedulerException ex) {
-      throw new SchedulingException("An exception occurred while retrieving task details.", ex);
-    }
+    return getTaskFromJobKey(JobKey.jobKey(JOB_NAME_PREFIX + taskId, key));
   }
 
   @Override
@@ -89,28 +89,34 @@ public class SchedulingService implements ISchedulingService {
     }
   }
 
-  private Task getTaskFromJobKey(JobKey jobKey) throws SchedulerException {
-    JobDetail jobDetail = scheduler.getJobDetail(jobKey);
-    if (jobDetail != null) {
-      List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
-      if (triggers.size() == 1) {
-        Trigger trigger = triggers.get(0);
-        String cronExpression =
-            trigger instanceof CronTrigger ? ((CronTrigger) trigger).getCronExpression() : null;
+  private Task getTaskFromJobKey(JobKey jobKey) {
+    try {
+      JobDetail jobDetail = scheduler.getJobDetail(jobKey);
+      if (jobDetail != null) {
+        List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
+        if (triggers.size() == 1) {
+          Trigger trigger = triggers.get(0);
+          String cronExpression =
+              trigger instanceof CronTrigger ? ((CronTrigger) trigger).getCronExpression() : null;
 
-        return new Task(
-            jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
-            jobKey.getGroup(),
-            ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
-            cronExpression,
-            jobParamsEncoder.getDecodeTaskData(jobDetail.getJobDataMap()));
+          return new Task(
+              jobKey.getName().replaceFirst(JOB_NAME_PREFIX, ""),
+              jobKey.getGroup(),
+              ZonedDateTime.ofInstant(trigger.getStartTime().toInstant(), ZoneOffset.UTC),
+              cronExpression,
+              jobParamsEncoder.getDecodeTaskData(jobDetail.getJobDataMap()));
+        }
+        throw new SchedulingException("Unexpected trigger count found for " + jobKey + " job");
       }
-      throw new SchedulingException("Unexpected trigger count found for " + jobKey + " job");
+    } catch (SchedulerException ex) {
+      /* Internal error that can be changed to a runtime one as is not a common condition */
+      log.error("Error retrieving jobdetails/triggers for key {}", jobKey, ex);
+      throw new SchedulingException("Cannot retrieve tasks for key " + jobKey, ex);
     }
     return null;
   }
 
-  private Trigger prepareNewTrigger(Task task) throws SchedulerException {
+  private Trigger prepareNewTrigger(Task task) throws SchedulerValidationException {
     String triggerName = TRIGGER_NAME_PREFIX + task.getId();
 
     if (task.getTriggerTime().isBefore(ZonedDateTime.now(ZoneOffset.UTC))) {
@@ -132,7 +138,8 @@ public class SchedulingService implements ISchedulingService {
         : builder.withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
   }
 
-  private Trigger prepareCronTrigger(TriggerBuilder<Trigger> builder, Task task) {
+  private Trigger prepareCronTrigger(TriggerBuilder<Trigger> builder, Task task)
+      throws SchedulerValidationException {
     try {
       new CronExpression(task.getCronExpression());
     } catch (ParseException ex) {
@@ -143,7 +150,8 @@ public class SchedulingService implements ISchedulingService {
     return builder.withSchedule(CronScheduleBuilder.cronSchedule(task.getCronExpression())).build();
   }
 
-  private JobDetail prepareNewJob(Task task, Endpoint endpoint) throws SchedulerException {
+  private JobDetail prepareNewJob(Task task, Endpoint endpoint)
+      throws SchedulerException, SchedulerValidationException {
     String jobName = JOB_NAME_PREFIX + task.getId();
 
     if (jobExists(jobName, task.getKey())) {
@@ -161,9 +169,15 @@ public class SchedulingService implements ISchedulingService {
         .build();
   }
 
-  private boolean triggerExists(String triggerName, String key) throws SchedulerException {
-    return scheduler.getTriggerKeys(GroupMatcher.groupEquals(key)).stream()
-        .anyMatch(tk -> tk.getName().equals(triggerName));
+  private boolean triggerExists(String triggerName, String key) {
+    try {
+      return scheduler.getTriggerKeys(GroupMatcher.groupEquals(key)).stream()
+          .anyMatch(tk -> tk.getName().equals(triggerName));
+    } catch (SchedulerException ex) {
+      /* Internal error that can be changed to a runtime one as is not a common condition */
+      log.error("Error retrieving trigger for key {}", key, ex);
+      throw new SchedulingException("Cannot retrieve trigger", ex);
+    }
   }
 
   private boolean jobExists(String jobName, String key) throws SchedulerException {
@@ -171,21 +185,13 @@ public class SchedulingService implements ISchedulingService {
         .anyMatch(tk -> tk.getName().equals(jobName));
   }
 
-  private JobDataMap createDataMap(Task task, Endpoint endpoint) {
-    if (task.getTaskData() != null
-        && task.getTaskData().values().stream()
-            .anyMatch(
-                o ->
-                    !ClassUtils.isPrimitiveOrWrapper(o.getClass())
-                        && !String.class.equals(o.getClass()))) {
-      throw new SchedulerValidationException(
-          "Invalid data map type. Only primitives and Strings are supported");
-    }
-
+  private JobDataMap createDataMap(Task task, Endpoint endpoint)
+      throws SchedulerValidationException {
     JobDataMap dataMap = new JobDataMap();
     if (task.getTaskData() != null) {
       dataMap.putAll(task.getTaskData());
     }
+
     dataMap.putAll(jobParamsEncoder.createEncodeJobParameters(task, endpoint));
     return dataMap;
   }

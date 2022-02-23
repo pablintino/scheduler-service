@@ -3,6 +3,7 @@ package com.pablintino.schedulerservice.helpers;
 import com.pablintino.schedulerservice.dtos.CallbackDescriptorDto;
 import com.pablintino.schedulerservice.dtos.CallbackMethodTypeDto;
 import com.pablintino.schedulerservice.dtos.ScheduleRequestDto;
+import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
@@ -78,8 +79,14 @@ public class DummyTasksProvider {
 
     Endpoint dummyEndpoint = new Endpoint(CallbackType.AMQP, null);
 
-    JobDataMap dataMap =
-        new JobDataMap(jobParamsEncoder.createEncodeJobParameters(dummyTask, dummyEndpoint));
+    JobDataMap dataMap = null;
+    try {
+      dataMap =
+          new JobDataMap(jobParamsEncoder.createEncodeJobParameters(dummyTask, dummyEndpoint));
+    } catch (SchedulerValidationException e) {
+      Assertions.fail("Dummy payload cannot be serialized");
+    }
+
     JobDetail job =
         JobBuilder.newJob(CallbackJob.class)
             .withIdentity(dummyTask.getId(), dummyTask.getKey())

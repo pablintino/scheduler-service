@@ -139,7 +139,7 @@ class SchedulesControllerIT {
 
     mockMvc
         .perform(
-            MockMvcRequestBuilders.post("/schedules")
+            MockMvcRequestBuilders.post("/api/v1/schedules")
                 .content(objectMapper.writeValueAsString(testModels.getScheduleRequestDto()))
                 .contentType(MediaType.APPLICATION_JSON))
         .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
@@ -166,7 +166,7 @@ class SchedulesControllerIT {
 
     mockMvc
         .perform(
-            MockMvcRequestBuilders.post("/schedules")
+            MockMvcRequestBuilders.post("/api/v1/schedules")
                 .content(objectMapper.writeValueAsString(testModels.getScheduleRequestDto()))
                 .contentType(MediaType.APPLICATION_JSON))
         .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
@@ -193,7 +193,7 @@ class SchedulesControllerIT {
 
     mockMvc
         .perform(
-            MockMvcRequestBuilders.post("/schedules")
+            MockMvcRequestBuilders.post("/api/v1/schedules")
                 .content(objectMapper.writeValueAsString(testModels.getScheduleRequestDto()))
                 .contentType(MediaType.APPLICATION_JSON))
         .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
@@ -207,7 +207,7 @@ class SchedulesControllerIT {
     mockMvc
         .perform(
             MockMvcRequestBuilders.delete(
-                "/schedules/{key}/{id}",
+                "/api/v1/schedules/{key}/{id}",
                 testModels.getTask().getKey(),
                 testModels.getTask().getId()))
         .andExpect(MockMvcResultMatchers.status().isNoContent());

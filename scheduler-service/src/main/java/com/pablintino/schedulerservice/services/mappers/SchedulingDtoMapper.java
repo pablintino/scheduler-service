@@ -3,11 +3,11 @@ package com.pablintino.schedulerservice.services.mappers;
 import com.pablintino.schedulerservice.dtos.ScheduleRequestDto;
 import com.pablintino.schedulerservice.dtos.ScheduleTaskDto;
 import com.pablintino.schedulerservice.dtos.TaskStatsDto;
-import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.Endpoint;
 import com.pablintino.schedulerservice.models.ScheduleJobMetadata;
 import com.pablintino.schedulerservice.models.Task;
+import com.pablintino.services.commons.exceptions.ValidationHttpServiceException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,9 +16,8 @@ public class SchedulingDtoMapper implements ISchedulingDtoMapper {
   @Override
   public Task mapTaskFromDto(ScheduleRequestDto scheduleRequestDto) {
     if (scheduleRequestDto == null) {
-      throw new SchedulerValidationException("scheduleRequestDto cannot be null");
+      throw new ValidationHttpServiceException("Schedule request cannot be null");
     }
-
     return new Task(
         scheduleRequestDto.getTaskIdentifier(),
         scheduleRequestDto.getTaskKey(),
@@ -29,13 +28,11 @@ public class SchedulingDtoMapper implements ISchedulingDtoMapper {
 
   @Override
   public Endpoint mapEndpointFromDto(ScheduleRequestDto scheduleRequestDto) {
-    if (scheduleRequestDto == null) {
-      throw new SchedulerValidationException("scheduleRequestDto cannot be null");
+    if (scheduleRequestDto == null | scheduleRequestDto.getCallbackDescriptor() == null) {
+      throw new ValidationHttpServiceException(
+          "Schedule request must contain a callback descriptor");
     }
-    if (scheduleRequestDto.getCallbackDescriptor() == null) {
-      throw new SchedulerValidationException(
-          "scheduleRequestDto callbackDescriptor cannot be null");
-    }
+
     return new Endpoint(
         CallbackType.valueOf(scheduleRequestDto.getCallbackDescriptor().getType().toString()),
         scheduleRequestDto.getCallbackDescriptor().getEndpoint());

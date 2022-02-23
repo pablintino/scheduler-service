@@ -34,7 +34,8 @@ public class JobParamsEncoder implements IJobParamsEncoder {
   private final ObjectMapper objectMapper;
 
   @Override
-  public Map<String, String> createEncodeJobParameters(Task task, Endpoint endpoint) {
+  public Map<String, String> createEncodeJobParameters(Task task, Endpoint endpoint)
+      throws SchedulerValidationException {
     HashMap<String, String> parametersMap = new HashMap<>();
 
     parametersMap.put(
@@ -76,7 +77,9 @@ public class JobParamsEncoder implements IJobParamsEncoder {
       try {
         return objectMapper.readValue(serializedTaskData, taskDataTypeReference);
       } catch (JsonProcessingException ex) {
+        /* Shouldn't happen as all tasks payload are validated by the serializer on creation */
         log.error("Error while deserializing task data map", ex);
+        throw new SchedulerServiceException("Cannot task data payload", ex);
       }
     }
     return null;
@@ -117,7 +120,7 @@ public class JobParamsEncoder implements IJobParamsEncoder {
     }
   }
 
-  private String createEncodeTaskParameters(Task task) {
+  private String createEncodeTaskParameters(Task task) throws SchedulerValidationException {
 
     try {
 

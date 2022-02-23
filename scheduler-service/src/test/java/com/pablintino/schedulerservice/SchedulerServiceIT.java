@@ -3,6 +3,7 @@ package com.pablintino.schedulerservice;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.pablintino.schedulerservice.configurations.InMemoryQuartzConfiguration;
+import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
 import com.pablintino.schedulerservice.helpers.DummyCallbackService;
 import com.pablintino.schedulerservice.helpers.DummyTaskDataModels;
 import com.pablintino.schedulerservice.helpers.DummyTasksProvider;
@@ -85,7 +86,7 @@ class SchedulerServiceIT {
 
   @Test
   @DirtiesContext
-  void simpleScheduleTaskOK() throws SchedulerException {
+  void simpleScheduleTaskOK() throws SchedulerValidationException {
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 
@@ -99,7 +100,7 @@ class SchedulerServiceIT {
 
   @Test
   @DirtiesContext
-  void getTasksOK() throws SchedulerException {
+  void getTasksOK() throws SchedulerValidationException {
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 2000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 
@@ -170,7 +171,7 @@ class SchedulerServiceIT {
 
   @Test
   @DirtiesContext
-  void deleteTaskOK() throws SchedulerException {
+  void deleteTaskOK() throws SchedulerValidationException {
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 
@@ -192,7 +193,7 @@ class SchedulerServiceIT {
 
   @Test
   @DirtiesContext
-  void getTaskOK() throws SchedulerException {
+  void getTaskOK() throws SchedulerValidationException {
     DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
     schedulingService.scheduleTask(testModels.getTask(), testModels.getEndpoint());
 

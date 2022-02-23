@@ -1,8 +1,6 @@
 package com.pablintino.schedulerservice.exceptions;
 
-import com.pablintino.services.commons.exceptions.ValidationHttpServiceException;
-
-public class SchedulerValidationException extends ValidationHttpServiceException {
+public class SchedulerValidationException extends Exception {
   public SchedulerValidationException(String message) {
     super(message);
   }
