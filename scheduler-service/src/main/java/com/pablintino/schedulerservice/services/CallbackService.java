@@ -21,7 +21,6 @@ import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 @Service
@@ -47,17 +46,16 @@ public class CallbackService implements ICallbackService {
   }
 
   @Override
-  public void executeCallback(SchedulerJobData jobData, Map<String, Object> taskDataMap) {
+  public void executeCallback(SchedulerJobData jobData, Object taskData) {
     if (jobData.getType() == CallbackType.AMQP) {
-      executeAmqpCallback(jobData, taskDataMap);
+      executeAmqpCallback(jobData, taskData);
     } else {
-      executeHttpCallback(jobData, taskDataMap);
+      executeHttpCallback(jobData, taskData);
     }
   }
 
-  private void executeAmqpCallback(
-      SchedulerJobData schedulerJobData, Map<String, Object> taskDataMap) {
-    CallbackMessage message = buildCallbackMessage(schedulerJobData, taskDataMap);
+  private void executeAmqpCallback(SchedulerJobData schedulerJobData, Object taskData) {
+    CallbackMessage message = buildCallbackMessage(schedulerJobData, taskData);
 
     try {
       rabbitTemplate.convertAndSend(exchangeName, schedulerJobData.getKey(), message);
@@ -72,9 +70,8 @@ public class CallbackService implements ICallbackService {
     }
   }
 
-  private void executeHttpCallback(
-      SchedulerJobData schedulerJobData, Map<String, Object> taskDataMap) {
-    CallbackMessage message = buildCallbackMessage(schedulerJobData, taskDataMap);
+  private void executeHttpCallback(SchedulerJobData schedulerJobData, Object taskData) {
+    CallbackMessage message = buildCallbackMessage(schedulerJobData, taskData);
 
     try {
       webClient
@@ -109,11 +106,11 @@ public class CallbackService implements ICallbackService {
   }
 
   private static CallbackMessage buildCallbackMessage(
-      SchedulerJobData schedulerJobData, Map<String, Object> taskDataMap) {
+      SchedulerJobData schedulerJobData, Object taskData) {
     return new CallbackMessage(
         schedulerJobData.getTaskId(),
         schedulerJobData.getKey(),
-        taskDataMap,
+        taskData,
         schedulerJobData.getMetadata().getTriggerTime(),
         schedulerJobData.getMetadata().getNotificationAttempt());
   }

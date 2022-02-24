@@ -28,7 +28,7 @@ public class SchedulingDtoMapper implements ISchedulingDtoMapper {
 
   @Override
   public Endpoint mapEndpointFromDto(ScheduleRequestDto scheduleRequestDto) {
-    if (scheduleRequestDto == null | scheduleRequestDto.getCallbackDescriptor() == null) {
+    if (scheduleRequestDto == null || scheduleRequestDto.getCallbackDescriptor() == null) {
       throw new ValidationHttpServiceException(
           "Schedule request must contain a callback descriptor");
     }

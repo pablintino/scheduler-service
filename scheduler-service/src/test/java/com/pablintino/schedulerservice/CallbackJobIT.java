@@ -57,8 +57,9 @@ class CallbackJobIT {
   static class TestConfiguration {
 
     @Bean
-    public DummyTasksProvider dummyTasksProvider(JobParamsEncoder jobParamsEncoder) {
-      return new DummyTasksProvider(jobParamsEncoder);
+    public DummyTasksProvider dummyTasksProvider(
+        JobParamsEncoder jobParamsEncoder, ObjectMapper objectMapper) {
+      return new DummyTasksProvider(jobParamsEncoder, objectMapper);
     }
 
     @Bean

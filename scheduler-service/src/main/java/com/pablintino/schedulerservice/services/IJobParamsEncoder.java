@@ -17,5 +17,5 @@ public interface IJobParamsEncoder {
 
   SchedulerJobData getDecodeSchedulerJobData(JobDataMap jobDataMap);
 
-  Map<String, Object> getDecodeTaskData(JobDataMap jobDataMap);
+  Object getDecodeTaskData(JobDataMap jobDataMap);
 }

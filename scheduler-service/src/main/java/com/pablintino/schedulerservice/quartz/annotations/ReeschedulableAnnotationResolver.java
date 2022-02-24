@@ -18,10 +18,10 @@ public class ReeschedulableAnnotationResolver implements IReeschedulableAnnotati
 
   private final ClassPathScanningCandidateComponentProvider candidateComponentProvider;
 
-  private final Set<Class> types;
+  private final Set<Class<?>> types;
 
   public ReeschedulableAnnotationResolver() {
-    Set<Class> tempTypes = new HashSet<>();
+    Set<Class<?>> tempTypes = new HashSet<>();
     candidateComponentProvider = new ClassPathScanningCandidateComponentProvider(false);
     candidateComponentProvider.addIncludeFilter(new AnnotationTypeFilter(Reeschedulable.class));
     String basePackage =
@@ -40,7 +40,7 @@ public class ReeschedulableAnnotationResolver implements IReeschedulableAnnotati
   }
 
   @Override
-  public Set<Class> getAnnotatedTypes() {
+  public Set<Class<?>> getAnnotatedTypes() {
     return types;
   }
 }

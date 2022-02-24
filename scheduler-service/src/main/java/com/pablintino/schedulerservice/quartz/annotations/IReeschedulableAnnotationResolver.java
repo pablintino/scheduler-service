@@ -4,5 +4,5 @@ import java.util.Set;
 
 public interface IReeschedulableAnnotationResolver {
 
-  Set<Class> getAnnotatedTypes();
+  Set<Class<?>> getAnnotatedTypes();
 }

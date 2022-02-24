@@ -1,7 +1,6 @@
 package com.pablintino.schedulerservice.services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pablintino.schedulerservice.exceptions.SchedulerServiceException;
 import com.pablintino.schedulerservice.exceptions.SchedulerValidationException;
@@ -27,10 +26,7 @@ import java.util.Map;
 public class JobParamsEncoder implements IJobParamsEncoder {
 
   private static final String SCHEDULER_JOB_DATA_PROPERTY_NAME = "__sch-data";
-  private static final String SCHEDULER_TASK_DATA_MAP_NAME = "__sch-task-data";
-  private static final TypeReference<HashMap<String, Object>> taskDataTypeReference =
-      new TypeReference<>() {};
-
+  private static final String SCHEDULER_TASK_DATA_NAME = "__sch-task-data";
   private final ObjectMapper objectMapper;
 
   @Override
@@ -40,7 +36,7 @@ public class JobParamsEncoder implements IJobParamsEncoder {
 
     parametersMap.put(
         SCHEDULER_JOB_DATA_PROPERTY_NAME, createEncodeSchedulerParameters(task, endpoint));
-    parametersMap.put(SCHEDULER_TASK_DATA_MAP_NAME, createEncodeTaskParameters(task));
+    parametersMap.put(SCHEDULER_TASK_DATA_NAME, createEncodeTaskParameters(task));
 
     return parametersMap;
   }
@@ -68,17 +64,17 @@ public class JobParamsEncoder implements IJobParamsEncoder {
   }
 
   @Override
-  public Map<String, Object> getDecodeTaskData(JobDataMap jobDataMap) {
-    if (jobDataMap.containsKey(SCHEDULER_TASK_DATA_MAP_NAME)) {
+  public Object getDecodeTaskData(JobDataMap jobDataMap) {
+    if (jobDataMap.containsKey(SCHEDULER_TASK_DATA_NAME)) {
       String serializedTaskData =
           new String(
-              Base64.getDecoder().decode(jobDataMap.getString(SCHEDULER_TASK_DATA_MAP_NAME)),
+              Base64.getDecoder().decode(jobDataMap.getString(SCHEDULER_TASK_DATA_NAME)),
               StandardCharsets.UTF_8);
       try {
-        return objectMapper.readValue(serializedTaskData, taskDataTypeReference);
+        return objectMapper.readValue(serializedTaskData, Object.class);
       } catch (JsonProcessingException ex) {
         /* Shouldn't happen as all tasks payload are validated by the serializer on creation */
-        log.error("Error while deserializing task data map", ex);
+        log.error("Error while deserializing task data object", ex);
         throw new SchedulerServiceException("Cannot task data payload", ex);
       }
     }
@@ -133,11 +129,11 @@ public class JobParamsEncoder implements IJobParamsEncoder {
 
     } catch (JsonProcessingException ex) {
       log.warn(
-          "Cannot serialize Task data map for task key {} and id {}",
+          "Cannot serialize Task data payload for task key {} and id {}",
           task.getKey(),
           task.getId(),
           ex);
-      throw new SchedulerValidationException("Task data map must be JSON serializable", ex);
+      throw new SchedulerValidationException("Task data payload must be JSON serializable", ex);
     }
   }
 }

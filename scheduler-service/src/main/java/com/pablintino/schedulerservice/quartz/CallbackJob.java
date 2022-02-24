@@ -27,7 +27,7 @@ public class CallbackJob implements Job {
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
-    log.debug("Job " + context.getJobDetail() + " starts its execution");
+    log.debug("Job " + context.getJobDetail().getKey() + " starts its execution");
     SchedulerJobData schedulerJobData = null;
     Instant handleStartInstant = Instant.now();
     JobDataMap jobDataMap = context.getJobDetail().getJobDataMap();
@@ -50,7 +50,7 @@ public class CallbackJob implements Job {
     }
     log.debug(
         "Job {} finished its execution in {} ms",
-        context.getJobDetail(),
+        context.getJobDetail().getKey(),
         Duration.between(handleStartInstant, Instant.now()).toMillis());
   }
 
@@ -158,16 +158,19 @@ public class CallbackJob implements Job {
   }
 
   private Trigger rebuildTrigger(JobExecutionContext jobExecutionContext) {
-    ScheduleBuilder scheduleBuilder =
-        jobExecutionContext.getTrigger() instanceof CronTrigger
-            ? CronScheduleBuilder.cronSchedule(
-                ((CronTrigger) jobExecutionContext.getTrigger()).getCronExpression())
-            : SimpleScheduleBuilder.simpleSchedule();
+    TriggerBuilder<Trigger> triggerBuilder =
+        TriggerBuilder.newTrigger()
+            .withIdentity(jobExecutionContext.getTrigger().getKey())
+            .startAt(Date.from(Instant.now().plusMillis(retrialDelay)));
 
-    return TriggerBuilder.newTrigger()
-        .withIdentity(jobExecutionContext.getTrigger().getKey())
-        .startAt(Date.from(Instant.now().plusMillis(retrialDelay)))
-        .withSchedule(scheduleBuilder)
-        .build();
+    if (jobExecutionContext.getTrigger() instanceof CronTrigger) {
+      return triggerBuilder
+          .withSchedule(
+              CronScheduleBuilder.cronSchedule(
+                  ((CronTrigger) jobExecutionContext.getTrigger()).getCronExpression()))
+          .build();
+    } else {
+      return triggerBuilder.withSchedule(SimpleScheduleBuilder.simpleSchedule()).build();
+    }
   }
 }

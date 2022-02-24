@@ -165,7 +165,7 @@ public class SchedulingService implements ISchedulingService {
 
     return JobBuilder.newJob(CallbackJob.class)
         .withIdentity(jobName, task.getKey())
-        .setJobData(createDataMap(task, endpoint))
+        .setJobData(new JobDataMap(jobParamsEncoder.createEncodeJobParameters(task, endpoint)))
         .build();
   }
 
@@ -183,16 +183,5 @@ public class SchedulingService implements ISchedulingService {
   private boolean jobExists(String jobName, String key) throws SchedulerException {
     return scheduler.getJobKeys(GroupMatcher.groupEquals(key)).stream()
         .anyMatch(tk -> tk.getName().equals(jobName));
-  }
-
-  private JobDataMap createDataMap(Task task, Endpoint endpoint)
-      throws SchedulerValidationException {
-    JobDataMap dataMap = new JobDataMap();
-    if (task.getTaskData() != null) {
-      dataMap.putAll(task.getTaskData());
-    }
-
-    dataMap.putAll(jobParamsEncoder.createEncodeJobParameters(task, endpoint));
-    return dataMap;
   }
 }

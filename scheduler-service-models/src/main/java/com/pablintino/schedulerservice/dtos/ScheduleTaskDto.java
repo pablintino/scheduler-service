@@ -4,7 +4,6 @@ import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.ZonedDateTime;
-import java.util.Map;
 
 @Data
 public class ScheduleTaskDto {
@@ -15,5 +14,5 @@ public class ScheduleTaskDto {
   private ZonedDateTime triggerTime;
 
   private String cronExpression;
-  private Map<String, Object> taskData;
+  private Object taskData;
 }

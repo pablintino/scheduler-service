@@ -1,5 +1,7 @@
 package com.pablintino.schedulerservice.helpers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pablintino.schedulerservice.dtos.CallbackDescriptorDto;
 import com.pablintino.schedulerservice.dtos.CallbackMethodTypeDto;
 import com.pablintino.schedulerservice.dtos.ScheduleRequestDto;
@@ -23,24 +25,42 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
 public class DummyTasksProvider {
 
   private final IJobParamsEncoder jobParamsEncoder;
+  private final ObjectMapper objectMapper;
 
-  public Map<String, Object> createSimpleJobDataMap() {
-    Map<String, Object> dummyMap = new HashMap<>();
-    dummyMap.put("key1-int", 1);
-    dummyMap.put("key1-double", 1.2);
-    dummyMap.put("key1-str", "test");
-    dummyMap.put("key1-bool", true);
-    return dummyMap;
+  public DummyTaskData createSimpleJobData() {
+    DummyTaskData taskData = new DummyTaskData();
+    Random random = new Random();
+    taskData.setTestDate(Date.from(Instant.now()));
+    taskData.setTestFloat(random.nextFloat());
+    taskData.setTestInt(random.nextInt());
+    taskData.setTestList(Arrays.asList("test-1", "test-2", "test-3"));
+    Map<String, Integer> testMap = new HashMap<>();
+    testMap.put("test-1", random.nextInt());
+    testMap.put("test-2", random.nextInt());
+    testMap.put("test-3", random.nextInt());
+    taskData.setTestMap(testMap);
+    return taskData;
+  }
+
+  public void validateDummyTaskData(Object expectedTaskData, Object dummyTaskData) {
+    Assertions.assertNotNull(expectedTaskData);
+    Assertions.assertNotNull(dummyTaskData);
+    try {
+      Assertions.assertEquals(
+          objectMapper.readValue(
+              objectMapper.writeValueAsString(expectedTaskData), DummyTaskData.class),
+          objectMapper.readValue(
+              objectMapper.writeValueAsString(dummyTaskData), DummyTaskData.class));
+    } catch (JsonProcessingException e) {
+      Assertions.fail("Cannot serialize to compare dummy task data");
+    }
   }
 
   public DummyTaskDataModels createSimpleValidJob(String name, long triggerTime) {
@@ -75,7 +95,7 @@ public class DummyTasksProvider {
             "it-test",
             ZonedDateTime.ofInstant(startDate.toInstant(), ZoneOffset.UTC),
             cron,
-            createSimpleJobDataMap());
+            createSimpleJobData());
 
     Endpoint dummyEndpoint = new Endpoint(CallbackType.AMQP, null);
 
@@ -132,8 +152,8 @@ public class DummyTasksProvider {
           index, currentEntry.getJobData().getMetadata().getNotificationAttempt());
 
       /* Ensure task data has not changed (User data given as task data should be equal to the one provided on creation */
-      Assertions.assertEquals(
-          dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskDataMap());
+      validateDummyTaskData(
+          dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskData());
 
       /* Ensure reported trigger time is the same as the real one */
       Assertions.assertEquals(
@@ -179,8 +199,10 @@ public class DummyTasksProvider {
       validateCommonSchedulerDataParams(dummyTaskDataModels, currentEntry.getJobData());
 
       Assertions.assertEquals(index + 1, currentEntry.getJobData().getMetadata().getExecutions());
-      Assertions.assertEquals(
-          dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskDataMap());
+
+      /* Ensure task data has not changed */
+      validateDummyTaskData(
+          dummyTaskDataModels.getTask().getTaskData(), currentEntry.getTaskData());
 
       /* Ensure reported trigger time is the same as the real one */
       Assertions.assertEquals(
@@ -264,9 +286,9 @@ public class DummyTasksProvider {
         callbackCallEntry.getJobData().getMetadata().getTriggerTime(),
         jobExecution.getJobExecutionContext().getFireTime().toInstant());
 
-    /* Ensure user data at task map is preserved without changes */
-    Assertions.assertEquals(
-        dummyTaskDataModels.getTask().getTaskData(), callbackCallEntry.getTaskDataMap());
+    /* Ensure task data is preserved without changes */
+    validateDummyTaskData(
+        dummyTaskDataModels.getTask().getTaskData(), callbackCallEntry.getTaskData());
   }
 
   public void validateCronValidJob(
@@ -321,8 +343,8 @@ public class DummyTasksProvider {
           jobData.getMetadata().getTriggerTime(),
           execution.getJobExecutionContext().getFireTime().toInstant());
 
-      /* Ensure user data at task map is preserved without changes */
-      Assertions.assertEquals(dummyTaskDataModels.getTask().getTaskData(), entry.getTaskDataMap());
+      /* Ensure task data is preserved without changes */
+      validateDummyTaskData(dummyTaskDataModels.getTask().getTaskData(), entry.getTaskData());
     }
   }
 
