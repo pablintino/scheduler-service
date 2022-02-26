@@ -1,5 +1,7 @@
 package com.pablintino.schedulerservice;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.pablintino.schedulerservice.configurations.InMemoryQuartzConfiguration;
 import com.pablintino.schedulerservice.helpers.DummyCallbackService;
 import com.pablintino.schedulerservice.helpers.DummyTaskDataModels;
@@ -18,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
@@ -25,121 +28,189 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-
 @SpringBootTest()
 @TestPropertySource(
-        properties = {
-                "com.pablintino.scheduler.failure-attempt-delay=1000",
-                "com.pablintino.scheduler.failure-attempts=5",
-        }
-)
+    properties = {
+      "com.pablintino.scheduler.failure-attempt-delay=1000",
+      "com.pablintino.scheduler.failure-attempts=5",
+    })
 class CallbackJobIT {
 
-    @Autowired
-    private DummyCallbackService dummyCallbackService;
+  @Autowired private DummyCallbackService dummyCallbackService;
 
-    @Autowired
-    private Scheduler scheduler;
+  @Autowired private Scheduler scheduler;
 
-    @Autowired
-    private DummyTasksProvider dummyTasksProvider;
+  @Autowired private DummyTasksProvider dummyTasksProvider;
 
-    @Value("${com.pablintino.scheduler.failure-attempt-delay}")
-    private long failureAttemptDelay;
+  @Autowired private QuartzJobListener jobListener;
 
-    @Value("${com.pablintino.scheduler.failure-attempts}")
-    private int failureAttempts;
+  @Value("${com.pablintino.scheduler.failure-attempt-delay}")
+  private long failureAttemptDelay;
 
+  @Value("${com.pablintino.scheduler.failure-attempts}")
+  private int failureAttempts;
 
-    @Autowired
-    private IReeschedulableAnnotationResolver reeschedulableAnnotationResolver;
+  @Autowired private IReeschedulableAnnotationResolver reeschedulableAnnotationResolver;
 
-    @Configuration
-    @Import(InMemoryQuartzConfiguration.class)
-    static class TestConfiguration {
+  @Configuration
+  @Import(InMemoryQuartzConfiguration.class)
+  static class TestConfiguration {
 
-        @Bean
-        public DummyTasksProvider dummyTasksProvider(JobParamsEncoder jobParamsEncoder){
-            return new DummyTasksProvider(jobParamsEncoder);
-        }
-
-        @Bean
-        public DummyCallbackService callbackService() {
-            return new DummyCallbackService();
-        }
-
-        @Bean
-        public JobParamsEncoder jobParamsEncoder() {
-            return new JobParamsEncoder();
-        }
-
-        @Bean
-        public IReeschedulableAnnotationResolver reeschedulableAnnotationResolver() {
-            return Mockito.mock(IReeschedulableAnnotationResolver.class);
-        }
+    @Bean
+    public DummyTasksProvider dummyTasksProvider(
+        JobParamsEncoder jobParamsEncoder, ObjectMapper objectMapper) {
+      return new DummyTasksProvider(jobParamsEncoder, objectMapper);
     }
 
-    @Test
-    @DirtiesContext
-    void simpleScheduledExecutionOK() throws SchedulerException {
-        QuartzJobListener listener = new QuartzJobListener();
-        scheduler.getListenerManager().addJobListener(listener);
-
-        DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
-
-        QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(1500);
-        Assertions.assertNotNull(jobExecution);
-        Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
-        DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
-
+    @Bean
+    QuartzJobListener jobListener(Scheduler scheduler) throws SchedulerException {
+      QuartzJobListener listener = new QuartzJobListener();
+      scheduler.getListenerManager().addJobListener(listener);
+      return listener;
     }
 
-    @Test
-    @DirtiesContext
-    void simpleScheduledExecutionUnreschedulableKO() throws SchedulerException {
-        QuartzJobListener listener = new QuartzJobListener();
-        scheduler.getListenerManager().addJobListener(listener);
+    @Bean
+    public ObjectMapper objectMapper() {
+      return Jackson2ObjectMapperBuilder.json().modules(new JavaTimeModule()).build();
+    }
 
-        dummyCallbackService.setCallback((s,j)->{
+    @Bean
+    public DummyCallbackService callbackService(ObjectMapper objectMapper) {
+      return new DummyCallbackService(objectMapper);
+    }
+
+    @Bean
+    public JobParamsEncoder jobParamsEncoder(ObjectMapper objectMapper) {
+      return new JobParamsEncoder(objectMapper);
+    }
+
+    @Bean
+    public IReeschedulableAnnotationResolver reeschedulableAnnotationResolver() {
+      return Mockito.mock(IReeschedulableAnnotationResolver.class);
+    }
+  }
+
+  @Test
+  @DirtiesContext
+  void simpleScheduledExecutionOK() throws SchedulerException {
+    DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
+    scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
+
+    QuartzJobListener.JobExecutionEntry jobExecution = jobListener.waitJobExecution(1500);
+    Assertions.assertNotNull(jobExecution);
+    Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
+    DummyCallbackService.CallbackCallEntry callbackCallEntry =
+        dummyCallbackService.getExecutions().peek();
+    dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecution);
+  }
+
+  @Test
+  @DirtiesContext
+  void cronScheduledExecutionOK() throws SchedulerException {
+    DummyTaskDataModels testModels =
+        dummyTasksProvider.createCronValidJob("test-job1", 1000, " 0/2 * * * * ? *");
+    scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
+
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        jobListener.waitJobExecutions(2, 5000);
+    Assertions.assertNotNull(jobExecutions);
+
+    dummyTasksProvider.validateCronValidJob(
+        testModels,
+        dummyCallbackService.getExecutions().stream().collect(Collectors.toList()),
+        jobExecutions);
+  }
+
+  @Test
+  @DirtiesContext
+  void simpleScheduledExecutionUnreschedulableKO() throws SchedulerException {
+    dummyCallbackService.setCallback(
+        (s, j) -> {
+          throw new RuntimeException("test exception");
+        });
+
+    DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
+    scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
+
+    QuartzJobListener.JobExecutionEntry jobExecution = jobListener.waitJobExecution(1500);
+    Assertions.assertNotNull(jobExecution);
+    Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
+    DummyCallbackService.CallbackCallEntry callbackCallEntry =
+        dummyCallbackService.getExecutions().peek();
+    dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry, jobExecution);
+
+    Assertions.assertEquals(0, jobListener.getExecutions().size());
+    Assertions.assertEquals(false, jobExecution.getEx().refireImmediately());
+    Assertions.assertNull(scheduler.getTrigger(testModels.getTrigger().getKey()));
+  }
+
+  @Test
+  @DirtiesContext
+  void simpleScheduledExecutionReschedulableKO() throws SchedulerException {
+    dummyCallbackService.setCallback(
+        (s, j) -> {
+          throw new IllegalArgumentException("test exception");
+        });
+
+    Mockito.when(reeschedulableAnnotationResolver.getAnnotatedTypes())
+        .thenReturn(Collections.singleton(RuntimeException.class));
+
+    DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
+    scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
+
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        jobListener.waitJobExecutions(
+            failureAttempts + 2,
+            Math.round(Math.ceil((failureAttempts + 1) * failureAttemptDelay * 1.1)));
+    Assertions.assertEquals(failureAttempts + 1, jobExecutions.size());
+
+    dummyTasksProvider.validateSimpleValidReattemptedNotRecoveredJob(
+        testModels,
+        dummyCallbackService.getExecutions().stream().collect(Collectors.toList()),
+        jobExecutions,
+        failureAttempts,
+        failureAttemptDelay);
+
+    Assertions.assertEquals(0, jobListener.getExecutions().size());
+    Assertions.assertFalse(jobExecutions.stream().anyMatch(ex -> ex.getEx().refireImmediately()));
+
+    /* Ensure trigger has been removed after non being able to recovering from failure */
+    Assertions.assertNull(scheduler.getTrigger(testModels.getTrigger().getKey()));
+  }
+
+  @Test
+  @DirtiesContext
+  void cronScheduledExecutionRecoveredFailureOK() throws SchedulerException {
+    dummyCallbackService.setCallback(
+        (s, j) -> {
+          if (s.getMetadata().getExecutions() < 3) {
             throw new RuntimeException("test exception");
+          }
         });
 
-        DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
+    Mockito.when(reeschedulableAnnotationResolver.getAnnotatedTypes())
+        .thenReturn(Collections.singleton(RuntimeException.class));
 
-        QuartzJobListener.JobExecutionEntry jobExecution = listener.waitJobExecution(1500);
-        Assertions.assertNotNull(jobExecution);
-        Assertions.assertEquals(1, dummyCallbackService.getExecutions().size());
-        DummyCallbackService.CallbackCallEntry callbackCallEntry = dummyCallbackService.getExecutions().peek();
-        dummyTasksProvider.validateSimpleValidJob(testModels, callbackCallEntry.getJobData(), callbackCallEntry.getJobDataMap(), callbackCallEntry.getScheduleEventMetadata().getTriggerTime());
+    DummyTaskDataModels testModels =
+        dummyTasksProvider.createCronValidJob("test-job1", 1000, " 0/2 * * * * ? *");
+    scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
 
-        Assertions.assertEquals(0, listener.getExecutions().size());
-        Assertions.assertEquals(false, jobExecution.getEx().refireImmediately());
-        Assertions.assertEquals(true, jobExecution.getEx().unscheduleAllTriggers());
-    }
+    List<QuartzJobListener.JobExecutionEntry> jobExecutions =
+        jobListener.waitJobExecutions(
+            4, (int) Math.floor((Math.ceil((2) * failureAttemptDelay) + 2000 * 3) * 1.1));
 
-    @Test
-    @DirtiesContext
-    void simpleScheduledExecutionReschedulableKO() throws SchedulerException {
-        QuartzJobListener listener = new QuartzJobListener();
-        scheduler.getListenerManager().addJobListener(listener);
+    /* Ensure trigger has not being deleted */
+    Assertions.assertNotNull(scheduler.getTrigger(testModels.getTrigger().getKey()));
 
-        dummyCallbackService.setCallback((s,j)->{
-            throw new IllegalArgumentException("test exception");
-        });
+    /* Delete trigger to prevent jobs to being launched while checking results*/
+    scheduler.unscheduleJob(testModels.getTrigger().getKey());
+    Assertions.assertEquals(4, jobExecutions.size());
 
-        Mockito.when(reeschedulableAnnotationResolver.getAnnotatedTypes()).thenReturn(Collections.singleton(RuntimeException.class));
-
-        DummyTaskDataModels testModels = dummyTasksProvider.createSimpleValidJob("test-job1", 1000);
-        scheduler.scheduleJob(testModels.getJobDetail(), testModels.getTrigger());
-
-
-        List<QuartzJobListener.JobExecutionEntry> jobExecutions= listener.waitJobExecutions(failureAttempts + 2, Math.round(Math.ceil((failureAttempts + 1)*failureAttemptDelay*1.1)));
-        Assertions.assertEquals(failureAttempts + 1, jobExecutions.size());
-        Assertions.assertEquals(failureAttempts + 1, dummyCallbackService.getExecutions().size());
-
-        dummyTasksProvider.validateSimpleValidReattemptedJob( testModels, dummyCallbackService.getExecutions().stream().collect(Collectors.toList()), failureAttempts, failureAttemptDelay);
-    }
+    dummyTasksProvider.validateCronReattemptedAndRecoveredJob(
+        testModels,
+        dummyCallbackService.getExecutions().stream().collect(Collectors.toList()),
+        jobExecutions,
+        failureAttemptDelay,
+        2);
+  }
 }

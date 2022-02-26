@@ -14,29 +14,33 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-public class ReeschedulableAnnotationResolver implements IReeschedulableAnnotationResolver{
+public class ReeschedulableAnnotationResolver implements IReeschedulableAnnotationResolver {
 
-    private final ClassPathScanningCandidateComponentProvider candidateComponentProvider;
+  private final ClassPathScanningCandidateComponentProvider candidateComponentProvider;
 
-    private final Set<Class> types;
+  private final Set<Class<?>> types;
 
-    public ReeschedulableAnnotationResolver() {
-        Set<Class> tempTypes = new HashSet<>();
-        candidateComponentProvider = new ClassPathScanningCandidateComponentProvider(false);
-        candidateComponentProvider.addIncludeFilter(new AnnotationTypeFilter(Reeschedulable.class));
-        String basePackage = String.join(".", Arrays.copyOfRange(this.getClass().getCanonicalName().split("\\."), 0, 2));
-        for (String className : candidateComponentProvider.findCandidateComponents(basePackage).stream().map(BeanDefinition::getBeanClassName).collect(Collectors.toList())) {
-            try {
-                tempTypes.add(Class.forName(className));
-            } catch (ClassNotFoundException ex) {
-                log.error("Cannot load annotated class " + className);
-            }
-        }
-        types = Collections.unmodifiableSet(tempTypes);
+  public ReeschedulableAnnotationResolver() {
+    Set<Class<?>> tempTypes = new HashSet<>();
+    candidateComponentProvider = new ClassPathScanningCandidateComponentProvider(false);
+    candidateComponentProvider.addIncludeFilter(new AnnotationTypeFilter(Reeschedulable.class));
+    String basePackage =
+        String.join(".", Arrays.copyOfRange(this.getClass().getCanonicalName().split("\\."), 0, 2));
+    for (String className :
+        candidateComponentProvider.findCandidateComponents(basePackage).stream()
+            .map(BeanDefinition::getBeanClassName)
+            .collect(Collectors.toList())) {
+      try {
+        tempTypes.add(Class.forName(className));
+      } catch (ClassNotFoundException ex) {
+        log.error("Cannot load annotated class " + className);
+      }
     }
+    types = Collections.unmodifiableSet(tempTypes);
+  }
 
-    @Override
-    public Set<Class> getAnnotatedTypes() {
-        return types;
-    }
+  @Override
+  public Set<Class<?>> getAnnotatedTypes() {
+    return types;
+  }
 }

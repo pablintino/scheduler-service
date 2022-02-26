@@ -6,8 +6,7 @@ import javax.validation.constraints.NotNull;
 
 @Data
 public class CallbackDescriptorDto {
-    @NotNull
-    private CallbackMethodTypeDto type;
+  @NotNull private CallbackMethodTypeDto type;
 
-    private String endpoint;
+  private String endpoint;
 }

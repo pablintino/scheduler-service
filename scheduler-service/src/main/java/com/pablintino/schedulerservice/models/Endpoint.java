@@ -8,12 +8,12 @@ import org.springframework.util.Assert;
 @ToString
 public class Endpoint {
 
-    private final CallbackType callbackType;
-    private final String callbackUrl;
+  private final CallbackType callbackType;
+  private final String callbackUrl;
 
-    public Endpoint(CallbackType callbackType, String callbackUrl) {
-        Assert.notNull(callbackType, "callbackType cannot be null");
-        this.callbackType = callbackType;
-        this.callbackUrl = callbackUrl;
-    }
+  public Endpoint(CallbackType callbackType, String callbackUrl) {
+    Assert.notNull(callbackType, "callbackType cannot be null");
+    this.callbackType = callbackType;
+    this.callbackUrl = callbackUrl;
+  }
 }

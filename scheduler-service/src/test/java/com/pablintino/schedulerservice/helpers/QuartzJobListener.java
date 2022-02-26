@@ -16,59 +16,58 @@ import java.util.concurrent.TimeUnit;
 
 public class QuartzJobListener implements JobListener {
 
-    @Getter
-    @RequiredArgsConstructor
-    public static class JobExecutionEntry {
-        private final JobExecutionContext jobExecutionContext;
-        private final JobExecutionException ex;
+  @Getter
+  @RequiredArgsConstructor
+  public static class JobExecutionEntry {
+    private final JobExecutionContext jobExecutionContext;
+    private final JobExecutionException ex;
+  }
+
+  @Getter private BlockingQueue<JobExecutionEntry> executions = new LinkedBlockingQueue<>();
+
+  @Override
+  public String getName() {
+    return "it-test-job-listener";
+  }
+
+  @Override
+  public void jobToBeExecuted(JobExecutionContext jobExecutionContext) {
+    // NOOP
+  }
+
+  @Override
+  public void jobExecutionVetoed(JobExecutionContext jobExecutionContext) {
+    // NOOP
+  }
+
+  @Override
+  public void jobWasExecuted(JobExecutionContext jobExecutionContext, JobExecutionException ex) {
+    executions.add(new JobExecutionEntry(jobExecutionContext, ex));
+  }
+
+  public JobExecutionEntry waitJobExecution(long millis) {
+    try {
+      return executions.poll(millis, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      return Assertions.fail("Exception while waiting job execution");
     }
+  }
 
-    @Getter
-    private BlockingQueue<JobExecutionEntry> executions = new LinkedBlockingQueue<>();
-
-    @Override
-    public String getName() {
-        return "it-test-job-listener";
-    }
-
-    @Override
-    public void jobToBeExecuted(JobExecutionContext jobExecutionContext) {
-        //NOOP
-    }
-
-    @Override
-    public void jobExecutionVetoed(JobExecutionContext jobExecutionContext) {
-        //NOOP
-    }
-
-    @Override
-    public void jobWasExecuted(JobExecutionContext jobExecutionContext, JobExecutionException ex) {
-        executions.add(new JobExecutionEntry(jobExecutionContext, ex));
-    }
-
-    public JobExecutionEntry waitJobExecution(long millis){
-        try {
-            return executions.poll(millis, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            return Assertions.fail("Exception while waiting job execution");
+  public List<JobExecutionEntry> waitJobExecutions(int count, long millis) {
+    long remaining = millis;
+    List<JobExecutionEntry> entries = new ArrayList<>();
+    try {
+      do {
+        Instant start = Instant.now();
+        JobExecutionEntry jobExecutionEntry = executions.poll(remaining, TimeUnit.MILLISECONDS);
+        if (jobExecutionEntry != null) {
+          entries.add(jobExecutionEntry);
         }
+        remaining -= Instant.now().toEpochMilli() - start.toEpochMilli();
+      } while (remaining > 0 && entries.size() < count);
+    } catch (InterruptedException e) {
+      return Assertions.fail("Exception while waiting job execution");
     }
-
-    public List<JobExecutionEntry> waitJobExecutions(int count, long millis){
-        long remaining = millis;
-        List<JobExecutionEntry> entries = new ArrayList<>();
-        try {
-            do{
-                Instant start = Instant.now();
-                JobExecutionEntry jobExecutionEntry = executions.poll(remaining, TimeUnit.MILLISECONDS);
-                if(jobExecutionEntry!=null){
-                    entries.add(jobExecutionEntry);
-                }
-                remaining -= Instant.now().toEpochMilli() - start.toEpochMilli();
-            }while (remaining>0 && entries.size() < count);
-        } catch (InterruptedException e) {
-            return Assertions.fail("Exception while waiting job execution");
-        }
-        return entries;
-    }
+    return entries;
+  }
 }

@@ -12,10 +12,9 @@ import org.quartz.Trigger;
 @RequiredArgsConstructor
 public class DummyTaskDataModels {
 
-    private final Task task;
-    private final Endpoint endpoint;
-    private final Trigger trigger;
-    private final JobDetail jobDetail;
-    private final ScheduleRequestDto scheduleRequestDto;
-
+  private final Task task;
+  private final Endpoint endpoint;
+  private final Trigger trigger;
+  private final JobDetail jobDetail;
+  private final ScheduleRequestDto scheduleRequestDto;
 }

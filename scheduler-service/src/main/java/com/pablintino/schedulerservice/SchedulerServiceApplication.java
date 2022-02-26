@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Import;
 @Import(SchedulerServiceConfiguration.class)
 public class SchedulerServiceApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(SchedulerServiceApplication.class, args);
-	}
+  public static void main(String[] args) {
+    SpringApplication.run(SchedulerServiceApplication.class, args);
+  }
 }
