@@ -1,9 +1,13 @@
 package com.pablintino.schedulerservice.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pablintino.schedulerservice.callback.CallbackMessage;
+import com.pablintino.schedulerservice.exceptions.CallbackHandleException;
 import com.pablintino.schedulerservice.exceptions.RemoteUnreachableException;
 import com.pablintino.schedulerservice.models.CallbackType;
 import com.pablintino.schedulerservice.models.SchedulerJobData;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -11,38 +15,35 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.core.publisher.Mono;
-import reactor.netty.http.client.PrematureCloseException;
 
 import java.io.IOException;
-import java.net.ConnectException;
-import java.net.UnknownHostException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.TimeoutException;
 
+@Slf4j
 @Service
 public class CallbackService implements ICallbackService {
 
   private final RabbitTemplate rabbitTemplate;
   private final String exchangeName;
-  private final WebClient webClient;
+  private final HttpClient httpClient;
+  private final ObjectMapper objectMapper;
   private final long httpCallbackTimeout;
 
   public CallbackService(
       RabbitTemplate rabbitTemplate,
-      WebClient.Builder webClientBuilder,
+      ObjectMapper objectMapper,
       @Value("${com.pablintino.scheduler.amqp.exchange-name}") String exchangeName,
       @Value("${com.pablintino.scheduler.http.callback-timeout:1000}") long httpCallbackTimeout) {
     this.rabbitTemplate = rabbitTemplate;
+    this.objectMapper = objectMapper;
     this.exchangeName = exchangeName;
     this.httpCallbackTimeout = httpCallbackTimeout;
-    this.webClient =
-        webClientBuilder
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .build();
+    this.httpClient = HttpClient.newBuilder().build();
   }
 
   @Override
@@ -74,34 +75,35 @@ public class CallbackService implements ICallbackService {
     CallbackMessage message = buildCallbackMessage(schedulerJobData, taskData);
 
     try {
-      webClient
-          .post()
-          .uri(schedulerJobData.getCallbackUrl())
-          .body(Mono.just(message), CallbackMessage.class)
-          .retrieve()
-          .bodyToMono(Void.class)
-          .timeout(Duration.of(httpCallbackTimeout, ChronoUnit.MILLIS))
-          .block();
-    } catch (WebClientResponseException ex) {
-      if (ex.getStatusCode().is5xxServerError()) {
-        /* Maybe something gone wrong... Another call may succeed */
-        throw new RemoteUnreachableException(ex);
+      HttpRequest httpRequest =
+          HttpRequest.newBuilder(URI.create(schedulerJobData.getCallbackUrl()))
+              .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+              .timeout(Duration.of(httpCallbackTimeout, ChronoUnit.MILLIS))
+              .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(message)))
+              .build();
+
+      HttpResponse<String> httpResponse =
+          httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+      int statusCode = httpResponse.statusCode();
+      if (statusCode / 100 == 5) {
+        /* 5XX: Maybe something gone wrong... Another call may succeed */
+        throw new RemoteUnreachableException("Remote cannot handle request. Code " + statusCode);
       }
-      /* Another call won't fix a 400/401/403/404... Don't reschedule... */
-      throw ex;
-    } catch (Exception ex) {
-      Throwable root = ExceptionUtils.getRootCause(ex);
-      if (root != null) {
-        Class rootType = root.getClass();
-        if (ConnectException.class.isAssignableFrom(rootType)
-            || TimeoutException.class.isAssignableFrom(rootType)
-            || UnknownHostException.class.isAssignableFrom(rootType)
-            || PrematureCloseException.class.isAssignableFrom(rootType)) {
-          /* Connection refused, timeout, DNS issues, TCP connection suddenly closed. Maybe transient/temporal */
-          throw new RemoteUnreachableException(ex);
-        }
+      if (statusCode / 100 != 2) {
+        /* Another call won't fix a 400/401/403/404... Don't reschedule... */
+        throw new CallbackHandleException("HTTP request failed with response code " + statusCode);
       }
-      throw ex;
+    } catch (JsonProcessingException ex) {
+      /* Should never occur as the payload has been previously serialized... */
+      log.error("Error serializing HTTP callback request");
+      throw new CallbackHandleException(ex);
+    } catch (IOException ex) {
+      /* Connection issues, timeout, peer reset connections, etc. */
+      throw new RemoteUnreachableException(ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new CallbackHandleException(ex);
     }
   }
 
