@@ -8,4 +8,8 @@ public class RemoteUnreachableException extends RuntimeException {
   public RemoteUnreachableException(Throwable throwable) {
     super(throwable);
   }
+
+  public RemoteUnreachableException(String message) {
+    super(message);
+  }
 }

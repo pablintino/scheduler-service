@@ -10,15 +10,17 @@ import com.pablintino.schedulerservice.quartz.CallbackJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.validator.routines.UrlValidator;
 import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.stereotype.Service;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.text.ParseException;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -158,9 +160,15 @@ public class SchedulingService implements ISchedulingService {
       throw new SchedulingException("Task " + task.getId() + " has been already scheduled");
     }
 
-    if (endpoint.getCallbackType() == CallbackType.HTTP
-        && !UrlValidator.getInstance().isValid(endpoint.getCallbackUrl())) {
-      throw new SchedulerValidationException("Endpoint of type HTTP contains an invalid URL");
+    if (endpoint.getCallbackType() == CallbackType.HTTP) {
+      try {
+        URL url = new URL(endpoint.getCallbackUrl());
+        if (Arrays.asList("http", "https").stream().noneMatch(p -> url.getProtocol().equals(p))) {
+          throw new SchedulerValidationException("Invalid endpoint protocol");
+        }
+      } catch (MalformedURLException ex) {
+        throw new SchedulerValidationException("Invalid endpoint URL", ex);
+      }
     }
 
     return JobBuilder.newJob(CallbackJob.class)
