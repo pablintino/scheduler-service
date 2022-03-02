@@ -1,7 +1,6 @@
 package com.pablintino.schedulerservice.dtos;
 
 import lombok.Data;
-import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
@@ -19,7 +18,6 @@ public class ScheduleRequestDto {
   @Pattern(regexp = "^[a-zA-Z0-9-.]*$")
   private String taskKey;
 
-  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private ZonedDateTime triggerTime;
 
   private String cronExpression;
