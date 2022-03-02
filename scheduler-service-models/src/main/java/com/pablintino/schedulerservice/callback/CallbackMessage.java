@@ -4,7 +4,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -24,7 +23,6 @@ public class CallbackMessage implements Serializable {
 
   private String key;
 
-  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private Instant triggerTime;
 
   private long notificationAttempt;
