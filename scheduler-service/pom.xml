@@ -19,8 +19,8 @@
         </dependency>
         <dependency>
             <groupId>com.pablintino.services</groupId>
-            <artifactId>service-commons</artifactId>
-            <version>0.0.1</version>
+            <artifactId>service-commons-exceptions-spring</artifactId>
+            <version>0.0.2</version>
         </dependency>
         <dependency>
             <groupId>com.pablintino.services</groupId>

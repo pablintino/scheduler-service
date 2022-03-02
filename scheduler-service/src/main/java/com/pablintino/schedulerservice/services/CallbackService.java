@@ -43,7 +43,10 @@ public class CallbackService implements ICallbackService {
     this.objectMapper = objectMapper;
     this.exchangeName = exchangeName;
     this.httpCallbackTimeout = httpCallbackTimeout;
-    this.httpClient = HttpClient.newBuilder().build();
+    this.httpClient =
+        HttpClient.newBuilder()
+            .connectTimeout(Duration.of(httpCallbackTimeout, ChronoUnit.MILLIS))
+            .build();
   }
 
   @Override

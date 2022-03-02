@@ -48,6 +48,8 @@ public class CallbackServiceTest {
     builderMock = Mockito.mockStatic(HttpClient.class);
     HttpClient.Builder clientBuilderMock = Mockito.mock(HttpClient.Builder.class);
     builderMock.when(HttpClient::newBuilder).thenReturn(clientBuilderMock);
+    Mockito.when(clientBuilderMock.connectTimeout(ArgumentMatchers.any()))
+        .thenReturn(clientBuilderMock);
     Mockito.when(clientBuilderMock.build()).thenReturn(httpClient);
   }
 
