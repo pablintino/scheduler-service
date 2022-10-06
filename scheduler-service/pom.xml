@@ -4,10 +4,10 @@
     <parent>
         <groupId>com.pablintino.services</groupId>
         <artifactId>scheduler-service-root</artifactId>
-        <version>0.0.5</version>
+        <version>0.0.6-SNAPSHOT</version>
     </parent>
     <artifactId>scheduler-service</artifactId>
-    <version>0.0.5</version>
+    <version>0.0.6-SNAPSHOT</version>
     <name>scheduler-service</name>
     <description>Scheduler service for pablintino arq.</description>
     <dependencies>
