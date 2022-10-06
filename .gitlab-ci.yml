@@ -1,5 +1,3 @@
-image: docker:19.03.12
-
 stages:
   - build
   - docker-build
@@ -45,6 +43,8 @@ workflow:
     POSTGRES_DB: "it-database"
     POSTGRES_USER: "postgres"
     POSTGRES_PASSWORD: "changeme"
+  before_script:
+    - source <(builder2 source)
   artifacts:
     paths:
       - scheduler-service/target/*.jar
@@ -53,7 +53,7 @@ workflow:
 
 # For merge requests do not `deploy` but only run `verify`.
 maven-build-verify:
-  image: maven:3.8.2-jdk-11
+  image: registry.internal.pablintino.net/tools/jdk-builder:v0.0.1-jdk11
   extends: .mvn_build_and_it_tests
   stage: build
   script:
@@ -62,7 +62,7 @@ maven-build-verify:
     - master
 
 maven-build-deploy:
-  image: maven:3.8.2-jdk-11
+  image: registry.internal.pablintino.net/tools/jdk-builder:v0.0.1-jdk11
   extends: .mvn_build_and_it_tests
   stage: build
   script:
@@ -75,29 +75,35 @@ maven-build-deploy:
 
 docker-build:
   stage: docker-build
-  variables:
-    # Do not clone. Not needed
-    GIT_STRATEGY: none
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - cat /etc/ssl/custom/root_ca.crt >> /kaniko/ssl/certs/additional-ca-cert-bundle.crt
   script:
-    - docker build -t $CI_REGISTRY_IMAGE:latest ./scheduler-service
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $CI_REGISTRY_IMAGE:latest
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}"/scheduler-service
+      --dockerfile "${CI_PROJECT_DIR}/scheduler-service/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}:latest"
   only:
     - master
 
 mvn-release:
-  image: maven:3.8.2-jdk-11
+  image: registry.internal.pablintino.net/tools/jdk-builder:v0.0.1-jdk11
   extends: .mvn_build_and_it_tests
   stage: release
   when: manual
   allow_failure: false
   before_script:
+    - source <(builder2 source)
     - 'mkdir -p ~/.ssh/'
     - echo -n "$DEPLOY_PRIVATE_KEY" | base64 --decode > ~/.ssh/id_rsa
-    - chmod 700 ~/.ssh
-    - chmod 600 ~/.ssh/id_rsa
-    - 'cp $KNOWN_HOSTS ~/.ssh/known_hosts'
-    - 'apt-get update && apt-get install -y git'
+    - 'chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa'
+    - 'ssh-keyscan $CI_SERVER_HOST >> ~/.ssh/known_hosts'
+    - 'chmod 644 ~/.ssh/known_hosts'
     - 'git config --global user.email "noreply@your.gitlab.host"'
     - 'git config --global user.name "GitLab CI"'
     - 'git checkout -B "$CI_COMMIT_REF_NAME"'
@@ -124,12 +130,19 @@ mvn-release:
 
 docker-release-tag:
   stage: docker-build-release
-  variables:
-    # Need to gather the whole repo to obtain the Dockerfile
-    GIT_STRATEGY: clone
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - cat /etc/ssl/custom/root_ca.crt >> /kaniko/ssl/certs/additional-ca-cert-bundle.crt
   script:
-    - docker build -t $CI_REGISTRY_IMAGE:$BUILD_VERSION --build-arg JAR_FILE=./target/$SPRING_BOOT_JAR_FILE ./scheduler-service
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $CI_REGISTRY_IMAGE:$BUILD_VERSION
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}"/scheduler-service
+      --dockerfile "${CI_PROJECT_DIR}/scheduler-service/Dockerfile"
+      --build-arg "JAR_FILE=./target/${SPRING_BOOT_JAR_FILE}"
+      --destination "${CI_REGISTRY_IMAGE}:${BUILD_VERSION}"
   only:
     - master
